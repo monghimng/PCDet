@@ -1,3 +1,4 @@
+import wandb
 import os
 import torch
 import torch.nn as nn
@@ -80,6 +81,8 @@ def main():
     log_config_to_file(cfg, logger=logger)
 
     tb_log = SummaryWriter(log_dir=str(output_dir / 'tensorboard')) if cfg.LOCAL_RANK == 0 else None
+    if args.local_rank == 0:
+        wandb.init(project='BEVSEG-PCDet', sync_tensorboard=True, name=args.extra_tag)
 
     # -----------------------create dataloader & network & optimizer---------------------------
     train_set, train_loader, train_sampler = build_dataloader(
