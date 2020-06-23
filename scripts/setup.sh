@@ -15,6 +15,7 @@ ln -s /data/ck/data/kitti_pcdet/kitti $CODE/BEVSEG/PCDet2/data/kitti
 ln -s /data/ck/data/argoverse/argoverse-tracking-kitti-format $CODE/BEVSEG/PCDet2/data/argo
 mkdir -p /data/ck/BEVSEG/PCDet2/output/ # write model checkpoints to bigger disk
 ln -s /data/ck/BEVSEG/PCDet2/output/ $CODE/BEVSEG/PCDet2/output
+rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ pavia ace
 
 # locally
 #git remote add upstream https://github.com/sshaoshuai/PCDet.git

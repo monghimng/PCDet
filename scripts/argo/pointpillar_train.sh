@@ -4,20 +4,20 @@
 #SBATCH -n 1
 #SBATCH -t 2-00:00
 #SBATCH --cpus-per-task 48
-#SBATCH  --gres gpu:7
+#SBATCH  --gres gpu:4
 
 
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 
-NAME=argo_4
+NAME=argo_centered_5
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-6}
 #python \
-python -m torch.distributed.launch --nproc_per_node=7 \
+python -m torch.distributed.launch --nproc_per_node=4 \
 train.py \
 --cfg_file cfgs/argo/pointpillar.yaml \
---batch_size 119 \
+--batch_size 68 \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
