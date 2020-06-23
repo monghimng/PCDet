@@ -4,3 +4,4 @@ venv/
 *.idea/
 *.so
 data/
+**.pth

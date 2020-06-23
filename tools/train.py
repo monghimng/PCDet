@@ -28,7 +28,7 @@ def parge_config():
     parser.add_argument('--ckpt', type=str, default=None, help='checkpoint to start from')
     parser.add_argument('--pretrained_model', type=str, default=None, help='pretrained_model')
     parser.add_argument('--launcher', choices=['none', 'pytorch', 'slurm'], default='none')
-    parser.add_argument('--tcp_port', type=int, default=18888, help='tcp port for distrbuted training')
+    parser.add_argument('--tcp_port', type=int, default=18889, help='tcp port for distrbuted training')
     parser.add_argument('--sync_bn', action='store_true', default=False, help='whether to use sync bn')
     parser.add_argument('--fix_random_seed', action='store_true', default=False, help='whether to use sync bn')
     parser.add_argument('--ckpt_save_interval', type=int, default=2, help='number of training epochs')
