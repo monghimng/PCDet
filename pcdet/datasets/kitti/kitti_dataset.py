@@ -17,6 +17,13 @@ from pcdet.datasets import DatasetTemplate
 
 class BaseKittiDataset(DatasetTemplate):
     def __init__(self, root_path, split='train'):
+        """
+        1. Determine the self.root_split_path, which points to all the files this KITTI dataset will read under
+        2. Read from the ImageSets file that corresponds to the split to construct the self.sample_id_list
+
+        :param root_path: root dir of KITTI, should contain subdir of training and testing
+        :param split: one of train, val, test. Note that in KITTI, val files are contained in root_path/training/...
+        """
         super().__init__()
         self.root_path = root_path
         self.root_split_path = os.path.join(self.root_path, 'training' if split != 'test' else 'testing')
@@ -28,6 +35,11 @@ class BaseKittiDataset(DatasetTemplate):
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if os.path.exists(split_dir) else None
 
     def set_split(self, split):
+        """
+        Reinitialize the split, the split path, and the sample id file.
+        :param split:
+        :return:
+        """
         self.__init__(self.root_path, split)
 
     def get_lidar(self, idx):
@@ -36,11 +48,21 @@ class BaseKittiDataset(DatasetTemplate):
         return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
 
     def get_image_shape(self, idx):
+        """
+        Obtain the image shape of image_2
+        :param idx:
+        :return:
+        """
         img_file = os.path.join(self.root_split_path, 'image_2', '%s.png' % idx)
         assert os.path.exists(img_file)
         return np.array(io.imread(img_file).shape[:2], dtype=np.int32)
 
     def get_label(self, idx):
+        """
+        Read the label_2 file of this idx and parse all the objects from it.
+        :param idx:
+        :return:
+        """
         label_file = os.path.join(self.root_split_path, 'label_2', '%s.txt' % idx)
         assert os.path.exists(label_file)
         return object3d_utils.get_objects_from_label(label_file)
@@ -67,13 +89,17 @@ class BaseKittiDataset(DatasetTemplate):
 
     @staticmethod
     def get_fov_flag(pts_rect, img_shape, calib):
-        '''
+        """
         Valid point should be in the image (and in the PC_AREA_SCOPE)
-        :param pts_rect:
+        :param pts_rect: lidar points but in the rectified camera coordinate
         :param img_shape:
         :return:
-        '''
+        """
+
+        # map the rect points onto the image plane
         pts_img, pts_rect_depth = calib.rect_to_img(pts_rect)
+
+        # create a mask, true for points within the image plane
         val_flag_1 = np.logical_and(pts_img[:, 0] >= 0, pts_img[:, 0] < img_shape[1])
         val_flag_2 = np.logical_and(pts_img[:, 1] >= 0, pts_img[:, 1] < img_shape[0])
         val_flag_merge = np.logical_and(val_flag_1, val_flag_2)
@@ -82,25 +108,54 @@ class BaseKittiDataset(DatasetTemplate):
         return pts_valid_flag
 
     def get_infos(self, num_workers=4, has_label=True, count_inside_pts=True, sample_id_list=None):
+        """
+        Compute a list of info dict that contains every metadata we need about the KITTI dataset.
+
+        :param num_workers: number of parallel threads to generate info for each scene
+        :param has_label: whether we process the annotations in the label files
+        :param count_inside_pts: if true, we also count and save the numer of lidar points each object 3d bboxes contain
+        :return: an info dict of the following structure:
+
+        point_cloud
+            lidar_id: the string that identifies the sample
+            num_features: number of point features, usually 4 (xyz reflectance)
+        image
+            image_id
+            image_shape
+        calib
+            Tr_velo_to_cam: transformation mtx that convert velodyn lidar coord sys into unrectified camera 2 coord
+            R0_rect: transformation from unrectified camera 2 coord to rectified camera 2 coord
+            P2: projection mtx from rectified camera 2 coord onto image2 plane
+        annos
+            gt_boxes_lidar: in lidar coord, the 3d bboxes' 7 values including xyz wlh ry
+            num_points_in_gt: num of points in each object
+
+        """
         import concurrent.futures as futures
 
         def process_single_scene(sample_idx):
             print('%s sample_idx: %s' % (self.split, sample_idx))
+
+            # an info of a scene is represented as a nest dict
             info = {}
+
+            # point cloud info dict
             pc_info = {'num_features': 4, 'lidar_idx': sample_idx}
             info['point_cloud'] = pc_info
 
+            # image info dict
             image_info = {'image_idx': sample_idx, 'image_shape': self.get_image_shape(sample_idx)}
             info['image'] = image_info
-            calib = self.get_calib(sample_idx)
 
+            # calibration matrixes info dict
+            # convert calib matrices to 4x4 so that we can use them in homogeneous coordinates
+            calib = self.get_calib(sample_idx)
             P2 = np.concatenate([calib.P2, np.array([[0., 0., 0., 1.]])], axis=0)
             R0_4x4 = np.zeros([4, 4], dtype=calib.R0.dtype)
             R0_4x4[3, 3] = 1.
             R0_4x4[:3, :3] = calib.R0
             V2C_4x4 = np.concatenate([calib.V2C, np.array([[0., 0., 0., 1.]])], axis=0)
             calib_info = {'P2': P2, 'R0_rect': R0_4x4, 'Tr_velo_to_cam': V2C_4x4}
-
             info['calib'] = calib_info
 
             if has_label:
@@ -110,18 +165,22 @@ class BaseKittiDataset(DatasetTemplate):
                 annotations['truncated'] = np.array([obj.truncation for obj in obj_list])
                 annotations['occluded'] = np.array([obj.occlusion for obj in obj_list])
                 annotations['alpha'] = np.array([obj.alpha for obj in obj_list])
-                annotations['bbox'] = np.concatenate([obj.box2d.reshape(1, 4) for obj in obj_list], axis=0)
+                annotations['bbox'] = np.concatenate([obj.box2d.reshape(1, 4) for obj in obj_list],
+                                                     axis=0)  # this is only the 2d image bbox
                 annotations['dimensions'] = np.array([[obj.l, obj.h, obj.w] for obj in obj_list])  # lhw(camera) format
                 annotations['location'] = np.concatenate([obj.loc.reshape(1, 3) for obj in obj_list], axis=0)
                 annotations['rotation_y'] = np.array([obj.ry for obj in obj_list])
                 annotations['score'] = np.array([obj.score for obj in obj_list])
                 annotations['difficulty'] = np.array([obj.level for obj in obj_list], np.int32)
 
+                # filter out the objects of class DontCare
+                # index refers to the object index in that scene, -1 means DontCare
                 num_objects = len([obj.cls_type for obj in obj_list if obj.cls_type != 'DontCare'])
                 num_gt = len(annotations['name'])
                 index = list(range(num_objects)) + [-1] * (num_gt - num_objects)
                 annotations['index'] = np.array(index, dtype=np.int32)
 
+                # convert the 3d bboxes annotations in rectified camera coordinate to velodyne lidar coordinate
                 loc = annotations['location'][:num_objects]
                 dims = annotations['dimensions'][:num_objects]
                 rots = annotations['rotation_y'][:num_objects]
@@ -149,6 +208,8 @@ class BaseKittiDataset(DatasetTemplate):
 
             return info
 
+        # self.sample_id_list contains a list of sample_idx to be processed
+        # map each to its corresponding frame info
         # temp = process_single_scene(self.sample_id_list[0])
         sample_id_list = sample_id_list if sample_id_list is not None else self.sample_id_list
         with futures.ThreadPoolExecutor(num_workers) as executor:
@@ -156,10 +217,33 @@ class BaseKittiDataset(DatasetTemplate):
         return list(infos)
 
     def create_groundtruth_database(self, info_path=None, used_classes=None, split='train'):
+        """
+        Construct a database of ground truths including their points. This is useful later for
+        data augmentation. The result is a kitti_dbinfos_train.pkl that contains info about those
+        gts, as well as a dir gt_database containing xxxxx.bin, where each bin file contains the
+        points of each gt object. The dbinfo is of the format
+
+        Car
+            [car0, car1, ...]
+        Cyclist
+            [cyclist0, cyclist1, ...]
+        Pedestrian
+            [p0, p1, ...]
+
+        where each object is a dict containing its metadata and paths to its lidar points.
+
+        :param info_path:
+        :param used_classes: the classes of objects that will be written to the dbinfo
+        :param split:
+        :return:
+        """
+        # the directory to save each gt's points
         database_save_path = Path(self.root_path) / ('gt_database' if split == 'train' else ('gt_database_%s' % split))
+        # the pkl db info containing metadata about each gts
         db_info_save_path = Path(self.root_path) / ('kitti_dbinfos_%s.pkl' % split)
 
         database_save_path.mkdir(parents=True, exist_ok=True)
+
         all_db_infos = {}
 
         with open(info_path, 'rb') as f:
@@ -177,6 +261,7 @@ class BaseKittiDataset(DatasetTemplate):
             gt_boxes = annos['gt_boxes_lidar']
 
             num_obj = gt_boxes.shape[0]
+            # point_indices[i] is a mask that finds all the points that belong to an object
             point_indices = roiaware_pool3d_utils.points_in_boxes_cpu(
                 torch.from_numpy(points[:, 0:3]), torch.from_numpy(gt_boxes)
             ).numpy()  # (nboxes, npoints)
@@ -186,6 +271,7 @@ class BaseKittiDataset(DatasetTemplate):
                 filepath = database_save_path / filename
                 gt_points = points[point_indices[i] > 0]
 
+                # move the points to the center origin
                 gt_points[:, :3] -= gt_boxes[i, :3]
                 with open(filepath, 'w') as f:
                     gt_points.tofile(f)
@@ -199,14 +285,34 @@ class BaseKittiDataset(DatasetTemplate):
                         all_db_infos[names[i]].append(db_info)
                     else:
                         all_db_infos[names[i]] = [db_info]
+
+        # find out the number of appearance per object type
         for k, v in all_db_infos.items():
             print('Database %s: %d' % (k, len(v)))
 
+        # write the db to disk
         with open(db_info_save_path, 'wb') as f:
             pickle.dump(all_db_infos, f)
 
     @staticmethod
     def generate_prediction_dict(input_dict, index, record_dict):
+        """
+        Generate the prediction dict for EACH sample, called by the post processing. All this fn
+        does really is mapping prediciton boxes to camera coordinates putting things together in
+        a predictions_dict.
+        Args:
+            input_dict: provided by the dataset to provide dataset-specific information
+            index: batch index of current sample
+            record_dict: the predicted results of current sample from the detector,
+                which currently includes these keys: {
+                    'boxes': (N, 7 + C)  [x, y, z, w, l, h, heading_in_kitti] in LiDAR coords
+                    'scores': (N)
+                    'labels': (N）
+                }
+        Returns:
+            predictions_dict: the required prediction dict of current scene for specific dataset
+        """
+
         # finally generate predictions.
         sample_idx = input_dict['sample_idx'][index] if 'sample_idx' in input_dict else -1
         boxes3d_lidar_preds = record_dict['boxes'].cpu().numpy()
@@ -233,6 +339,17 @@ class BaseKittiDataset(DatasetTemplate):
 
     @staticmethod
     def generate_annotations(input_dict, pred_dicts, class_names, save_to_file=False, output_dir=None):
+        """
+        This fn conceptually combines predictions for each frame into the format of a batch, and also
+        ran a few more postprocessing.
+        :param input_dict:
+        :param pred_dicts:
+        :param class_names:
+        :param save_to_file:
+        :param output_dir:
+        :return:
+        """
+
         def get_empty_prediction():
             ret_dict = {
                 'name': np.array([]), 'truncated': np.array([]), 'occluded': np.array([]),
@@ -243,11 +360,22 @@ class BaseKittiDataset(DatasetTemplate):
             return ret_dict
 
         def generate_single_anno(idx, box_dict):
+            """
+            Takes in the predictions of one frame and run some more postprocessing.
+            :param idx:
+            :param box_dict:
+            :return:
+                anno
+                num_example: number of objects that are left are filtering in this frame
+            """
             num_example = 0
             if 'bbox' not in box_dict:
                 return get_empty_prediction(), num_example
 
             area_limit = image_shape = None
+
+            # the flags USE_IMAGE_AREA_FILTER filter out bbox predictions that is outside the IMAGE PLANE and
+            # is too big compared to the image area
             if cfg.MODEL.TEST.BOX_FILTER['USE_IMAGE_AREA_FILTER']:
                 image_shape = input_dict['image_shape'][idx]
                 area_limit = image_shape[0] * image_shape[1] * 0.8
@@ -273,6 +401,7 @@ class BaseKittiDataset(DatasetTemplate):
                     if area > area_limit:
                         continue
 
+                # filter out points in the lidar coordinate that are outside certain range
                 if 'LIMIT_RANGE' in cfg.MODEL.TEST.BOX_FILTER:
                     limit_range = np.array(cfg.MODEL.TEST.BOX_FILTER['LIMIT_RANGE'])
                     if np.any(box_lidar[:3] < limit_range[:3]) or np.any(box_lidar[:3] > limit_range[3:]):
@@ -413,7 +542,6 @@ class KittiDataset(BaseKittiDataset):
             )
             voxel_grid = self.voxel_generator.generate(points)
 
-
     def __len__(self):
         return len(self.kitti_infos)
 
@@ -513,8 +641,12 @@ if __name__ == '__main__':
         )
     else:
         A = KittiDataset(root_path='data/kitti', class_names=cfg.CLASS_NAMES, split='train', training=True)
-        import pdb
-        pdb.set_trace()
         ans = A[1]
 
+"""
+note that this code determine root dir by the directory in which you installed setup.py
 
+rm -r /data/ck/data/argoverse/argoverse-tracking-kitti-format/
+rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ pavia como
+python ~/BEVSEG/PCDet/pcdet/datasets/kitti/kitti_dataset.py create_kitti_infos
+"""

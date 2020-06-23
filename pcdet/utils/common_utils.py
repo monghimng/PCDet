@@ -66,7 +66,11 @@ def enlarge_box3d(boxes3d, extra_width):
 
 def drop_info_with_name(info, name):
     ret_info = {}
+
+    # determine the samples whose name we want to keep
     keep_indices = [i for i, x in enumerate(info['name']) if x != name]
+
+    # go through each type of information and keep the samples we want
     for key in info.keys():
         ret_info[key] = info[key][keep_indices]
     return ret_info

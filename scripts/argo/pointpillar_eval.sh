@@ -17,11 +17,14 @@ python \
 test.py \
 --cfg_file cfgs/argo/pointpillar.yaml \
 --batch_size 20 \
---extra_tag $NAME \
---eval_all \
+--save_to_file \
+--ckpt /data/ck/BEVSEG/PCDet2/output/pointpillar/argo_2/ckpt/checkpoint_epoch_80.pth \
+#--eval_all \
+#--extra_tag $NAME \
 
 << sample_cmds
 cksbatch --nodelist=pavia ~/BEVSEG/PCDet2/scripts/argo/pointpillar_eval.sh
+cksbatch --nodelist=como ~/BEVSEG/PCDet2/scripts/argo/pointpillar_eval.sh
 bash $CODE/BEVSEG/PCDet2/scripts/argo/pointpillar_eval.sh
 sample_cmds
 

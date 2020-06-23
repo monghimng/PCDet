@@ -635,13 +635,26 @@ def do_coco_style_eval(gt_annos, dt_annos, current_classes, overlap_ranges,
 
 
 def get_official_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict=None):
+    """
+
+    :param gt_annos:
+    :param dt_annos:
+    :param current_classes: a list of strings representing the classes of each object
+    :param PR_detail_dict:
+    :return:
+    """
+
+    ### compute the minimum overlaps at which a prediction can be considered to be for a gt object
     overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7,
                              0.5, 0.7], [0.7, 0.5, 0.5, 0.7, 0.5, 0.7],
                             [0.7, 0.5, 0.5, 0.7, 0.5, 0.7]])
     overlap_0_5 = np.array([[0.7, 0.5, 0.5, 0.7,
                              0.5, 0.5], [0.5, 0.25, 0.25, 0.5, 0.25, 0.5],
                             [0.5, 0.25, 0.25, 0.5, 0.25, 0.5]])
-    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
+    # of size [2, 3, 5]. 3 for difficulty hard, medium, and easy. 5 for the
+    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)
+
+    # convert class strings to their integer representation
     class_to_name = {
         0: 'Car',
         1: 'Pedestrian',
@@ -660,6 +673,8 @@ def get_official_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict
         else:
             current_classes_int.append(curcls)
     current_classes = current_classes_int
+
+
     min_overlaps = min_overlaps[:, :, current_classes]
     result = ''
     # check whether alpha is valid
