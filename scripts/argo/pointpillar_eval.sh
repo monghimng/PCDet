@@ -10,17 +10,19 @@
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 
-NAME=argo_3
+NAME=argo_ptpillar_centered_7
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-6}
 python \
 test.py \
---cfg_file cfgs/argo/pointpillar.yaml \
---batch_size 20 \
---save_to_file \
---ckpt /data/ck/BEVSEG/PCDet2/output/pointpillar/argo_2/ckpt/checkpoint_epoch_80.pth \
-#--eval_all \
-#--extra_tag $NAME \
+--cfg_file cfgs/argo/pointpillar_centered.yaml \
+--batch_size 9 \
+--extra_tag $NAME \
+--eval_all \
+#--ckpt /data/ck/BEVSEG/PCDet2/output/pointpillar_centered/$NAME/ckpt/checkpoint_epoch_28.pth \
+#--set \
+#DATA_CONFIG.TEST.INFO_PATH '["data/argo/kitti_infos_train.pkl"]' \
+#--save_to_file \
 
 << sample_cmds
 cksbatch --nodelist=pavia ~/BEVSEG/PCDet2/scripts/argo/pointpillar_eval.sh

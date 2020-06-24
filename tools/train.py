@@ -82,7 +82,7 @@ def main():
 
     tb_log = SummaryWriter(log_dir=str(output_dir / 'tensorboard')) if cfg.LOCAL_RANK == 0 else None
     if args.local_rank == 0:
-        wandb.init(project='BEVSEG-PCDet', sync_tensorboard=True, name=args.extra_tag)
+        wandb.init(project='BEVSEG-PCDet', sync_tensorboard=True, name=args.extra_tag, config={**vars(args), **cfg})
 
     # -----------------------create dataloader & network & optimizer---------------------------
     train_set, train_loader, train_sampler = build_dataloader(
