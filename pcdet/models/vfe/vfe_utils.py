@@ -33,6 +33,8 @@ class MeanVoxelFeatureExtractor(VoxelFeatureExtractor):
         points_mean = features[:, :, :].sum(dim=1, keepdim=False) / num_voxels.type_as(features).view(-1, 1)
         return points_mean.contiguous()
 
+############################## For PointPillar ##############################
+
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
     """Create boolean mask by actually number of a padded tensor.
@@ -62,9 +64,21 @@ class PFNLayer(nn.Module):
                  use_norm=True,
                  last_layer=False):
         """
-        Pillar Feature Net Layer.
+        Pillar Feature Net Layer. Its structure is:
+
+            - fully connected layer on each points
+            - batch norm
+            - relu
+            - max operation
+        
+        If this isn't the last layer of the voxel feature extractor network, the result is the relu'ed result
+        of each point concatenated with the max'ed results (duplicated for each point in the voxel). Otherwise,
+        only the max'ed output is returned, so that the features of several points are mapped to the features
+        of one voxel.
+        
         The Pillar Feature Net could be composed of a series of these layers, but the PointPillars paper results only
         used a single PFNLayer.
+        
         :param in_channels: <int>. Number of input channels.
         :param out_channels: <int>. Number of output channels.
         :param use_norm: <bool>. Whether to include BatchNorm.
@@ -101,7 +115,6 @@ class PFNLayer(nn.Module):
             x_concatenated = torch.cat([x, x_repeat], dim=2)
             return x_concatenated
 
-
 class PillarFeatureNetOld2(VoxelFeatureExtractor):
     def __init__(self,
                  num_input_features=4,
@@ -123,12 +136,18 @@ class PillarFeatureNetOld2(VoxelFeatureExtractor):
         super().__init__()
         self.name = 'PillarFeatureNetOld2'
         assert len(num_filters) > 0
+        
+        # num_input_features increase by 6 because pointpillar adds the distance from points mean (xyz_p) 
+        # and the distance from the voxel center (xyz_v)
         num_input_features += 6
+        
+        # whether or not we add the feature of the distance between the point and the origin
         if with_distance:
             num_input_features += 1
         self.with_distance = with_distance
         self.num_filters = num_filters
-        # Create PillarFeatureNetOld layers
+
+        ### Create PillarFeatureNetOld layers
         num_filters = [num_input_features] + list(num_filters)
         pfn_layers = []
         for i in range(len(num_filters) - 1):
@@ -156,9 +175,10 @@ class PillarFeatureNetOld2(VoxelFeatureExtractor):
 
     def forward(self, features, num_voxels, coords):
         """
-        :param features: (N, max_points_of_each_voxel, 3 + C)
-        :param num_voxels: (N)
-        :param coors:
+        :param features: (N, max_points_of_each_voxel, 3 + C), where N is the total num of voxels across all examples,
+            3 represents xyz, and C represent any additional input features such as reflectance.
+        :param num_voxels: (N) number of points in each voxels
+        :param coors: (N, 3) contains integral coordinate for each voxel in ZYX (height, left-right, front-back)
         :return:
         """
         dtype = features.dtype

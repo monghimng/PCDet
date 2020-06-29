@@ -29,15 +29,26 @@ def create_anchors_3d_range(feature_size,
                             rotations=(0, np.pi / 2),
                             dtype=np.float32):
     """
+    Examples:
+        Calling this fn with feature_size [3, 4, 5] over the anchor range of [0, 0, 0, 1, 1, 1], 
+        with 2 possible anchor sizes and 2 possible rotations, will generate anchors of the shape
+        [3, 4, 5, 2, 2, 7], where that 7 numbers describes a specific anchor.
     Args:
-        feature_size: list [D, H, W](zyx)
-        sizes: [N, 3] list of list or array, size of anchors, xyz
+        feature_size: List [D, H, W](zyx), where xyz is in the lidar coordinate. Note that this is
+            not the usual xyz lidar coordinate. ``z`` comes first as a channel because it will 
+            eventually be concatenated and combined into the feature dimension C.
+        anchor_range: List [6] (x_min, y_min, z_min, x_max, y_max, z_max) defining the range to generate
+            anchors over.
+        sizes: [N, 3] list of list or array. Represents possible sizes of anchors, xyz.
+        rotations: A list of possible rotations to generate anchors for.
 
     Returns:
         anchors: [*feature_size, num_sizes, num_rots, 7] tensor.
     """
 
     anchor_range = np.array(anchor_range, dtype)
+
+    # generate the values of xyz centers and rotations
     z_centers = np.linspace(
         anchor_range[2], anchor_range[5], feature_size[0], dtype=dtype)
     y_centers = np.linspace(
@@ -48,6 +59,8 @@ def create_anchors_3d_range(feature_size,
     rotations = np.array(rotations, dtype=dtype)
     rets = np.meshgrid(
         x_centers, y_centers, z_centers, rotations, indexing='ij')
+
+    # generate the values for all possible sizes
     tile_shape = [1] * 5
     tile_shape[-2] = int(sizes.shape[0])
     for i in range(len(rets)):
@@ -57,8 +70,12 @@ def create_anchors_3d_range(feature_size,
     tile_size_shape = list(rets[0].shape)
     tile_size_shape[3] = 1
     sizes = np.tile(sizes, tile_size_shape)
+
+    # combine possible sizes(xyz also) into xyz centers and rots
     rets.insert(3, sizes)
     ret = np.concatenate(rets, axis=-1)
+    
+    # reorders because feature sizes have a different xyz ordering
     return np.transpose(ret, [2, 1, 0, 3, 4, 5])
 
 
@@ -196,6 +213,21 @@ def iou_jit(boxes, query_boxes, eps=0.0):
 class AnchorGeneratorRange(object):
     def __init__(self, anchor_ranges, sizes=((1.6, 3.9, 1.56),), rotations=(0, np.pi / 2), class_name=None,
                  match_threshold=-1, unmatch_threshold=-1, custom_values=None, dtype=np.float32, feature_map_size=None):
+        """Generate all possible anchors over a range.
+        
+        The main fn of interest is the generate fn.
+
+        Args:
+            anchor_ranges ():
+            sizes ():
+            rotations ():
+            class_name (): The name of the class this anchor generators is for, eg, ``Car`` or ``Pedestrian``
+            match_threshold ():
+            unmatch_threshold ():
+            custom_values (): Not sure what this does. But I don't see any of our fn using this.
+            dtype ():
+            feature_map_size ():
+        """
         self._sizes = sizes
         self._anchor_ranges = anchor_ranges
         self._rotations = rotations

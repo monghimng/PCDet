@@ -10,10 +10,20 @@ echo Begin!
 
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
 NAME=argo_parta2_centered_5
 
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-6}
+### debug cmd, no distributed training, small batch size, no dataloader thread
+python \
+train.py \
+--cfg_file cfgs/argo/PartA2_centered.yaml \
+--extra_tag debug_$RANDOM \
+--batch_size 2 \
+--workers 0 \
+
+exit
+
 #python \
 python -m torch.distributed.launch --nproc_per_node=6 \
 train.py \

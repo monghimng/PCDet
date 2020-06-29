@@ -35,7 +35,33 @@ def build_optimizer(model, optim_cfg):
 
 
 def build_scheduler(optimizer, total_iters_each_epoch, total_epochs, last_epoch, optim_cfg):
+    """Build a lr scheduler and a lr warm up scheduler for the optimizer to control the LR.
+
+    If optim_cfg.OPTIMIZER is adam_onecycle, only the adam_onecyle lr scheduler is returned,
+    without any warm up lr scheduler.
+
+    Otherwise, both lr scheduler and warm up lr scheduler are returned.
+
+    Args:
+        optimizer (): The PyTorch Optimizer that we are using for this experiment.
+        total_iters_each_epoch (): The number of iteration per epoch.
+        total_epochs (): The ending epoch of this experiment.
+        last_epoch (): The starting epoch of this experiment. Useful if we are resuming.
+        optim_cfg (): A dictionary of cfg for the optimizer.
+
+    Returns:
+        lr_scheduler (): A scheduler to control LR.
+        lr_warmup_scheduler (): A scheudler to control LR for the initial warm up period.
+            Note that during training, this scheduler will only be picked if
+                - optim_cfg.LR_WARMUP is True
+                - current epoch is less than optim_cfg.WARMUP_EPOCH (warm up period)
+
+    """
+
+    # the train steps at which to decay the lr by a multiplicative factor
     decay_steps = [x * total_iters_each_epoch for x in optim_cfg.DECAY_STEP_LIST]
+
+    # the function that controls the lr following the decay_steps, used by lr_sched.LambdaLR
     def lr_lbmd(cur_epoch):
         cur_decay = 1
         for decay_step in decay_steps:
@@ -45,6 +71,7 @@ def build_scheduler(optimizer, total_iters_each_epoch, total_epochs, last_epoch,
 
     lr_warmup_scheduler = None
     total_steps = total_iters_each_epoch * total_epochs
+
     if optim_cfg.OPTIMIZER == 'adam_onecycle':
         lr_scheduler = OneCycle(
             optimizer, total_steps, optim_cfg.LR, list(optim_cfg.MOMS), optim_cfg.DIV_FACTOR, optim_cfg.PCT_START

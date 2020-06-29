@@ -1,8 +1,14 @@
 from .detector3d import Detector3D
 from ...config import cfg
 
-
 class PointPillar(Detector3D):
+    """
+    PointPillar network from https://arxiv.org/abs/1812.05784. This is a 1 stage detector consisted of
+        vfe: PillarFeatureNetOld2. See vfe_utils.py for details.
+        rpn: PointPillarsScatter. See pillar_scatter.py for details.
+
+
+    """
     def __init__(self, num_class, dataset):
         super().__init__(num_class, dataset)
         self.build_networks(cfg.MODEL)

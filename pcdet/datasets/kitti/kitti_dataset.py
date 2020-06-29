@@ -590,6 +590,7 @@ class KittiDataset(BaseKittiDataset):
         example['sample_idx'] = sample_idx
         example['image_shape'] = img_shape
 
+        import pdb;pdb.set_trace()
         return example
 
 

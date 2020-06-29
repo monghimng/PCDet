@@ -10,13 +10,13 @@
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 
-NAME=argo_ptpillar_centered_7
+NAME=argo_ptpillar_centered_adam_8
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-6}
 python \
 test.py \
 --cfg_file cfgs/argo/pointpillar_centered.yaml \
---batch_size 9 \
+--batch_size 10 \
 --extra_tag $NAME \
 --eval_all \
 #--ckpt /data/ck/BEVSEG/PCDet2/output/pointpillar_centered/$NAME/ckpt/checkpoint_epoch_28.pth \

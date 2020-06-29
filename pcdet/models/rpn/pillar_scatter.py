@@ -3,6 +3,12 @@ import torch.nn as nn
 
 
 class PointPillarsScatter(nn.Module):
+    """
+    All this does is it takes in input of size (N, F) where N is the total number of pillar (across batch) and
+    F is the feature count for each pillar. If figures out where each pillar is located on the 2D BEV plane, 
+    and assign the BEV's pixel to that pillar. This module does not contain any learnable params.
+    """
+    
     def __init__(self, input_channels=64, **kwargs):
         """
         Point Pillar's Scatter.
