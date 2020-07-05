@@ -10,12 +10,12 @@
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 
-NAME=argo_ptpillar_centered_adam_8
+NAME=argo_ptpillar_centered_adam50x50_9
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-6}
 python \
 test.py \
---cfg_file cfgs/argo/pointpillar_centered.yaml \
+--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
 --batch_size 10 \
 --extra_tag $NAME \
 --eval_all \

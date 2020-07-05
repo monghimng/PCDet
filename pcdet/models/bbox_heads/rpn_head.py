@@ -295,6 +295,7 @@ class RPNV2(AnchorHead):
             ret_dict['spatial_features_%dx' % stride] = x
 
             ups.append(self.deblocks[i](x))
+        import pdb;pdb.set_trace()
 
         if self._concat_input:
             ups.append(x_in)

@@ -6,12 +6,15 @@ class PointPillar(Detector3D):
     PointPillar network from https://arxiv.org/abs/1812.05784. This is a 1 stage detector consisted of
         vfe: PillarFeatureNetOld2. See vfe_utils.py for details.
         rpn: PointPillarsScatter. See pillar_scatter.py for details.
-
+        rpn_head: RPNV2.
 
     """
     def __init__(self, num_class, dataset):
         super().__init__(num_class, dataset)
         self.build_networks(cfg.MODEL)
+
+        # ckk
+
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
         voxel_features = self.vfe(
@@ -62,3 +65,28 @@ class PointPillar(Detector3D):
 
         loss = loss_rpn
         return loss, tb_dict, disp_dict
+
+    # def forward(self, input_dict):
+    #     rpn_ret_dict = self.forward_rpn(**input_dict)
+    #
+    #     # obtain bev features in the right output dimension
+    #     rpn_features = rpn_ret_dict['spatial_features_last']
+    #     bev_features = self.bev_conv(rpn_features)
+    #
+    #     # compute predictions for both training and validation
+    #
+    #     if self.training:
+    #
+    #         ret_dict = {
+    #             'loss': loss
+    #         }
+    #
+    #         # include miou and iou for each class in tb
+    #         tb_dict = {
+    #
+    #         }
+    #         disp_dict = None
+    #         return ret_dict, tb_dict, disp_dict
+    #     else:
+    #         pred_dicts, recall_dicts = self.predict_boxes(rpn_ret_dict, rcnn_ret_dict=None, input_dict=input_dict)
+    #         return pred_dicts, recall_dicts

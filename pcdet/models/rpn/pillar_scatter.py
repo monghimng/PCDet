@@ -11,8 +11,8 @@ class PointPillarsScatter(nn.Module):
     
     def __init__(self, input_channels=64, **kwargs):
         """
-        Point Pillar's Scatter.
-        Converts learned features from dense tensor to sparse pseudo image.
+        Point Pillar's Scatter. Converts learned features from dense tensor to sparse pseudo image.
+
         :param output_shape: ([int]: 4). Required output shape of features.
         :param num_input_features: <int>. Number of input features.
         """

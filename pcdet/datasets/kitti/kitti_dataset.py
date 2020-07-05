@@ -13,6 +13,8 @@ from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
 from pcdet.config import cfg
 from pcdet.datasets.data_augmentation.dbsampler import DataBaseSampler
 from pcdet.datasets import DatasetTemplate
+import cv2
+import pathlib
 
 
 class BaseKittiDataset(DatasetTemplate):
@@ -56,6 +58,38 @@ class BaseKittiDataset(DatasetTemplate):
         img_file = os.path.join(self.root_split_path, 'image_2', '%s.png' % idx)
         assert os.path.exists(img_file)
         return np.array(io.imread(img_file).shape[:2], dtype=np.int32)
+
+    def get_bev(self, idx):
+        """
+        Get the bird's eye view segmentation ground truths. The variable `classes` contain
+        all the classes the model will predict. `DRIVABLE` means drivable region, and are
+        allowed to overlap with other object types such as `VEHICLE` and `PEDESTRIAN`.
+        Args:
+            idx (): the sample idx of this training example, eg, 000001
+
+        Returns:
+            bevs: an array of shape [C, Row, Col], where C is the number of classes
+        """
+        classes = ['DRIVABLE', 'VEHICLE']
+        bevs = []
+
+        bnds = np.array([-25, 25, -25, 25])
+        meter_per_pixel = 0.25
+        pixel_bnds = bnds / meter_per_pixel
+        pixel_bnds = pixel_bnds.astype(np.int)
+
+
+        for cls in classes:
+            bev_path = os.path.join(self.root_split_path, 'bev_{}'.format(cls), '%s.png' % idx)
+            assert os.path.exists(bev_path)
+            bev = cv2.imread(bev_path, cv2.IMREAD_ANYDEPTH)
+            rows_center, cols_center = np.array(bev.shape) // 2
+            # crop to the center
+            top, bottom = pixel_bnds[0] + rows_center, pixel_bnds[1] + rows_center
+            left, right = pixel_bnds[2] + cols_center, pixel_bnds[3] + cols_center
+            bev = bev[top: bottom, left: right]
+            bevs.append(bev)
+        return np.array(bevs)
 
     def get_label(self, idx):
         """
@@ -590,7 +624,10 @@ class KittiDataset(BaseKittiDataset):
         example['sample_idx'] = sample_idx
         example['image_shape'] = img_shape
 
-        import pdb;pdb.set_trace()
+        # add the bev training maps
+        bev = self.get_bev(sample_idx)
+        example['bev'] = bev
+
         return example
 
 
@@ -636,9 +673,12 @@ def create_kitti_infos(data_path, save_path, workers=4):
 
 if __name__ == '__main__':
     if sys.argv.__len__() > 1 and sys.argv[1] == 'create_kitti_infos':
+
+        # takes second argument as the root dir
+        root_dir = pathlib.Path(sys.argv[2])
         create_kitti_infos(
-            data_path=cfg.ROOT_DIR / 'data' / 'kitti',
-            save_path=cfg.ROOT_DIR / 'data' / 'kitti'
+            data_path=root_dir,
+            save_path=root_dir
         )
     else:
         A = KittiDataset(root_path='data/kitti', class_names=cfg.CLASS_NAMES, split='train', training=True)
@@ -649,5 +689,6 @@ note that this code determine root dir by the directory in which you installed s
 
 rm -r /data/ck/data/argoverse/argoverse-tracking-kitti-format/
 rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ pavia como
-python ~/BEVSEG/PCDet/pcdet/datasets/kitti/kitti_dataset.py create_kitti_infos
+rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ r11 pavia
+python ~/BEVSEG/PCDet2/pcdet/datasets/kitti/kitti_dataset.py create_kitti_infos /data/ck/data/argoverse/argoverse-tracking-kitti-format/
 """

@@ -10,14 +10,14 @@
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 
-NAME=argo_ptpillar_centered_adam_8
+NAME=argo_ptpillar_centered_adam50x50_9
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
 python \
 train.py \
---cfg_file cfgs/argo/pointpillar_centered.yaml \
+--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
 --batch_size 2 \
 --extra_tag debug_$RANDOM \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
@@ -28,7 +28,7 @@ exit
 #python \
 python -m torch.distributed.launch --nproc_per_node=4 \
 train.py \
---cfg_file cfgs/argo/pointpillar_centered.yaml \
+--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
 --batch_size 64 \
 --extra_tag $NAME \
 --launcher pytorch \

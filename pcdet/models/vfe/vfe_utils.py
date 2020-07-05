@@ -126,6 +126,7 @@ class PillarFeatureNetOld2(VoxelFeatureExtractor):
         """
         Pillar Feature Net.
         The network prepares the pillar features and performs forward pass through PFNLayers.
+
         :param num_input_features: <int>. Number of input features, either x, y, z or x, y, z, r.
         :param use_norm: <bool>. Whether to include BatchNorm.
         :param num_filters: (<int>: N). Number of features in each of the N PFNLayers.
