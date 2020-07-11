@@ -3,6 +3,7 @@ import os
 import glob
 import tqdm
 from torch.nn.utils import clip_grad_norm_
+import wandb
 
 
 def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, accumulated_iter, optim_cfg,
@@ -29,6 +30,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
 
         if tb_log is not None:
             tb_log.add_scalar('learning_rate', cur_lr, accumulated_iter)
+            tb_log.add_scalar('epoch', accumulated_iter / total_it_each_epoch, accumulated_iter)
 
         model.train()
         optimizer.zero_grad()
@@ -52,8 +54,15 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             if tb_log is not None:
                 tb_log.add_scalar('train_loss', loss, accumulated_iter)
                 tb_log.add_scalar('learning_rate', cur_lr, accumulated_iter)
+
                 for key, val in tb_dict.items():
-                    tb_log.add_scalar('train_' + key, val, accumulated_iter)
+                    # log some bev images every epoch
+                    if 'image' in key:
+                        # log x times per epoch
+                        if cur_it % (total_it_each_epoch // 5) == 0:
+                            wandb.log({key: wandb.Image(val, caption=batch['sample_idx'][0])})
+                    else:
+                        tb_log.add_scalar('train_' + key, val, accumulated_iter)
     if rank == 0:
         pbar.close()
     return accumulated_iter

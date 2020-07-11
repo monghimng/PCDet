@@ -16,16 +16,19 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 #python \
 #train.py \
 #--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
-#--batch_size 2 \
+#--batch_size 20 \
 #--extra_tag debug_$RANDOM \
 #--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
-#--workers 0 \
+#--workers 5 \
 #
 #exit
 
 
 NAME=argo_ptpillar_centered_adam50x50_9
-NAME=bev_0
+NAME=bev_lmbda0.001_5
+NAME=bev_lrsteps_6
+NAME=bev_lrsteps_halvedposweights_7
+NAME=bev_lrsteps_halvedposweights_lr0.03_7
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
@@ -36,13 +39,15 @@ train.py \
 --sync_bn \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 --batch_size 32 \
+--tcp_port 10006 \
+--set \
+MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
+MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[20, 40]' \
+MODEL.TRAIN.OPTIMIZATION.LR_WARMUP True \
+MODEL.TRAIN.OPTIMIZATION.LR 0.03 \
 #--epochs 200 \
 #--batch_size 64 \
-#--set \
-#MODEL.TRAIN.OPTIMIZATION.LR 0.0003 \
-#MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
 #MODEL.TRAIN.OPTIMIZATION.LR 0.0001 \
-#MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[30, 60, 100]' \
 
 << notes
 batch sizes:
