@@ -619,8 +619,15 @@ class KittiDataset(BaseKittiDataset):
                 'gt_boxes_lidar': gt_boxes_lidar
             })
 
-        example = self.prepare_data(input_dict=input_dict, has_label='annos' in info)
+        # debuggin model; here we cheat by tagging if each point is in the object bbox
+        corners_lidar = box_utils.boxes3d_to_corners3d_lidar(gt_boxes_lidar)
+        for k in range(len(gt_boxes_lidar)):
+            if gt_names[k] == 'Car':
+                flag = box_utils.in_hull(points[:, 0:3], corners_lidar[k])
+                points[flag, 3] = 1
+        input_dict['points'] = points
 
+        example = self.prepare_data(input_dict=input_dict, has_label='annos' in info)
         example['sample_idx'] = sample_idx
         example['image_shape'] = img_shape
 

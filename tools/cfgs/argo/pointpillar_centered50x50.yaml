@@ -5,8 +5,8 @@ DATA_CONFIG:
     DATA_DIR: 'data/argo'
     FOV_POINTS_ONLY: False
     NUM_POINT_FEATURES: {
-        'total': 3,
-        'use': 3
+        'total': 4,
+        'use': 4
     }
     POINT_CLOUD_RANGE: [-25, -25, -1, 25, 25, 3]
     MASK_POINTS_BY_RANGE: True

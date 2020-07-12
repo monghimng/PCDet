@@ -1,4 +1,5 @@
 from .detector3d import Detector3D
+import torch.nn.functional as F
 import wandb
 from ...config import cfg
 import numpy as np
@@ -9,6 +10,27 @@ from ...utils.metrics import Evaluator
 # for calculating weights in bce losses
 # pos_samples = 0
 # neg_samples = 0
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.logits = logits
+        self.reduce = reduce
+
+    def forward(self, inputs, targets):
+        if self.logits:
+            BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduce=False)
+        else:
+            BCE_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
+        pt = torch.exp(-BCE_loss)
+        F_loss = self.alpha * (1-pt)**self.gamma * BCE_loss
+
+        if self.reduce:
+            return torch.mean(F_loss)
+        else:
+            return F_loss
 
 class PointPillar(Detector3D):
     """
@@ -24,11 +46,30 @@ class PointPillar(Detector3D):
 
         # bev conv
         in_channels_bev = 384
-        out_channels_bev = 2
-        self.bev_conv = nn.Conv2d(in_channels_bev, out_channels_bev, 3, padding=1, bias=True)
+        out_channels_bev = 1 #todo
         # this was calculated by counting number of positive pixels for each cls
-        pos_weights = torch.Tensor([1.7736, 28.0409]).cuda() / 2
+        # pos_weights = torch.Tensor([1.7736, 28.0409]).cuda() / 2# todo
+        pos_weights = torch.Tensor([28.0409]).cuda()
+        pos_weights = torch.Tensor([28.0409]).cuda() / 2
         self.bev_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
+        # self.bev_loss = nn.L1Loss()
+        # self.bev_loss = FocalLoss(alpha=pos_weights, logits=True)
+
+        num_block = 6
+        div_factor_for_channel = (in_channels_bev / out_channels_bev) ** (1 / num_block)
+        print(div_factor_for_channel)
+        blocks = []
+        for j in range(num_block):
+            in_chan = int(in_channels_bev // (div_factor_for_channel ** j))
+            out_chan = int(in_channels_bev // (div_factor_for_channel ** (j + 1)))
+            print(out_chan)
+            blocks.append(nn.Conv2d(in_chan, out_chan, 1))
+            blocks.append(nn.ReLU())
+            blocks.append(nn.Conv2d(out_chan, out_chan, 3, padding=1))
+            blocks.append(nn.BatchNorm2d(out_chan))
+            blocks.append(nn.ReLU())
+        blocks.append(nn.Conv2d(out_channels_bev, out_channels_bev, 3, padding=1, bias=True))
+        self.bev_conv = nn.Sequential(*blocks)
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
         voxel_features = self.vfe(
@@ -87,12 +128,13 @@ class PointPillar(Detector3D):
         if self.training:
 
             ############################## compute loss #############################
-            num_classes = 2
+            num_classes = 1
 
             # obtain bev features in the right output dimension
             rpn_features = rpn_ret_dict['spatial_features_last']
             bev_features = self.bev_conv(rpn_features)
-            gt = input_dict['bev'].astype(np.int32)
+            # gt = input_dict['bev'].astype(np.int32) # todo
+            gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
 
             # torch loss only takes in tensor :(
             gt_tensor = torch.tensor(gt, dtype=torch.float32, device=torch.cuda.current_device())
@@ -118,7 +160,7 @@ class PointPillar(Detector3D):
             # bev_loss = self.bev_loss(bev_features, gt_tensor)
 
             loss, tb_dict, disp_dict = self.get_training_loss()
-            loss = 0.01 * loss + bev_loss
+            loss = 0.001 * loss + bev_loss
             tb_dict['bev_loss'] = bev_loss.item()
 
             ret_dict = {

@@ -12,14 +12,14 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 
-## for debugging, with only 1 gpu, no distributed training, no dataloading thread
+# for debugging, with only 1 gpu, no distributed training, no dataloading thread
 #python \
 #train.py \
 #--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
-#--batch_size 20 \
+#--batch_size 2 \
 #--extra_tag debug_$RANDOM \
 #--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
-#--workers 5 \
+#--workers 0 \
 #
 #exit
 
@@ -29,6 +29,13 @@ NAME=bev_lmbda0.001_5
 NAME=bev_lrsteps_6
 NAME=bev_lrsteps_halvedposweights_7
 NAME=bev_lrsteps_halvedposweights_lr0.03_7
+NAME=bev_vehicle_only_9
+NAME=bev_vehicle_only_halfposweight_9
+NAME=focal_9
+NAME=bev_l1loss_10
+NAME=bev_moreblocks_11
+NAME=bev_moreblocks_oldloss_12
+NAME=bev_tagbboxpoints_13
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
@@ -38,13 +45,13 @@ train.py \
 --launcher pytorch \
 --sync_bn \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
---batch_size 32 \
---tcp_port 10006 \
+--batch_size 24 \
+--tcp_port 10004 \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
-MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[20, 40]' \
+MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[30, 60]' \
 MODEL.TRAIN.OPTIMIZATION.LR_WARMUP True \
-MODEL.TRAIN.OPTIMIZATION.LR 0.03 \
+MODEL.TRAIN.OPTIMIZATION.LR 0.003 \
 #--epochs 200 \
 #--batch_size 64 \
 #MODEL.TRAIN.OPTIMIZATION.LR 0.0001 \
