@@ -59,7 +59,8 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                     # log some bev images every epoch
                     if 'image' in key:
                         # log x times per epoch
-                        if cur_it % (total_it_each_epoch // 5) == 0:
+                        if cur_it % (total_it_each_epoch // 20) == 0:
+                        # if True:
                             wandb.log({key: wandb.Image(val, caption=batch['sample_idx'][0])})
                     else:
                         tb_log.add_scalar('train_' + key, val, accumulated_iter)

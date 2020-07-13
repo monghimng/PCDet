@@ -27,11 +27,11 @@ DATA_CONFIG:
 
     AUGMENTATION:
         NOISE_PER_OBJECT:
-            ENABLED: True
+            ENABLED: False
             GT_LOC_NOISE_STD: [1.0, 1.0, 0.1]
             GT_ROT_UNIFORM_NOISE: [-0.78539816, 0.78539816]
         NOISE_GLOBAL_SCENE:
-            ENABLED: True
+            ENABLED: False
             GLOBAL_ROT_UNIFORM_NOISE: [-0.78539816, 0.78539816]
             GLOBAL_SCALING_UNIFORM_NOISE: [0.95, 1.05]
         DB_SAMPLER:

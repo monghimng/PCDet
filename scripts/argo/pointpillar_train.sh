@@ -12,17 +12,21 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 
-# for debugging, with only 1 gpu, no distributed training, no dataloading thread
-#python \
-#train.py \
-#--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
-#--batch_size 2 \
-#--extra_tag debug_$RANDOM \
-#--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
-#--workers 0 \
-#
-#exit
+#DEBUG=true
+DEBUG=false
 
+if [ "$DEBUG" = true ] ; then
+# for debugging, with only 1 gpu, no distributed training, no dataloading thread
+python \
+train.py \
+--cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
+--batch_size 2 \
+--extra_tag debug_$RANDOM \
+--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
+--workers 0 \
+
+exit
+fi
 
 NAME=argo_ptpillar_centered_adam50x50_9
 NAME=bev_lmbda0.001_5
@@ -36,6 +40,7 @@ NAME=bev_l1loss_10
 NAME=bev_moreblocks_11
 NAME=bev_moreblocks_oldloss_12
 NAME=bev_tagbboxpoints_13
+NAME=bev_projected_taggedpoints_17
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \

@@ -59,6 +59,15 @@ class PointPillar(Detector3D):
         div_factor_for_channel = (in_channels_bev / out_channels_bev) ** (1 / num_block)
         print(div_factor_for_channel)
         blocks = []
+
+        # todo: this is only for debug
+        lst = [1, 4, 16, 64, 384]
+        for ck, in_channels_bev in zip(lst[:-1], lst[1:]):
+            blocks.append(nn.Conv2d(ck, in_channels_bev, 3, padding=1))
+            blocks.append(nn.BatchNorm2d(in_channels_bev))
+            blocks.append(nn.ReLU())
+        blocks.append((nn.Conv2d(384, 384, 3, stride=2, padding=1)))
+
         for j in range(num_block):
             in_chan = int(in_channels_bev // (div_factor_for_channel ** j))
             out_chan = int(in_channels_bev // (div_factor_for_channel ** (j + 1)))
@@ -72,6 +81,19 @@ class PointPillar(Detector3D):
         self.bev_conv = nn.Sequential(*blocks)
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
+
+        v = voxels.detach()
+        v = v.reshape([v.shape[0], -1])
+        self.rpn_net.nchannels = 128
+        vv = self.rpn_net( v, coordinates, batch_size, output_shape=self.grid_size[::-1] )
+        self.rpn_net.nchannels = 64
+        vv = vv.reshape([vv.shape[0], 32, 4, vv.shape[-2], vv.shape[-1]])
+        tag_only = vv[:, :, 3, :, :]
+        aggregated = tag_only.max(dim=1)[0]
+        aggregated = torch.unsqueeze(aggregated, dim=1)
+
+
+
         voxel_features = self.vfe(
             features=voxels,
             num_voxels=num_points,
@@ -91,7 +113,10 @@ class PointPillar(Detector3D):
             'rpn_box_preds': rpn_preds_dict['box_preds'],
             'rpn_dir_cls_preds': rpn_preds_dict.get('dir_cls_preds', None),
             'anchors': rpn_preds_dict['anchors'],
-            'spatial_features_last': rpn_preds_dict['spatial_features_last']
+            'spatial_features_last': rpn_preds_dict['spatial_features_last'],
+
+            # todo
+            'ck': aggregated,
         }
         return rpn_ret_dict
 
@@ -131,10 +156,20 @@ class PointPillar(Detector3D):
             num_classes = 1
 
             # obtain bev features in the right output dimension
-            rpn_features = rpn_ret_dict['spatial_features_last']
+
+            # opt1: using poitnpillar features
+            # rpn_features = rpn_ret_dict['spatial_features_last']
+            # opt2: using projected points # todo this is cheating :D
+            rpn_features = rpn_ret_dict['ck']
+
             bev_features = self.bev_conv(rpn_features)
+
             # gt = input_dict['bev'].astype(np.int32) # todo
             gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
+
+            gt = np.transpose(gt, [0, 1, 3, 2])
+            gt = gt[:, :, ::-1, ::-1]
+            gt = np.ascontiguousarray(gt)
 
             # torch loss only takes in tensor :(
             gt_tensor = torch.tensor(gt, dtype=torch.float32, device=torch.cuda.current_device())
@@ -160,7 +195,7 @@ class PointPillar(Detector3D):
             # bev_loss = self.bev_loss(bev_features, gt_tensor)
 
             loss, tb_dict, disp_dict = self.get_training_loss()
-            loss = 0.001 * loss + bev_loss
+            loss = 0.0000001 * loss + bev_loss
             tb_dict['bev_loss'] = bev_loss.item()
 
             ret_dict = {
@@ -177,6 +212,7 @@ class PointPillar(Detector3D):
             for cls_idx in range(num_classes):
                 # pick the 0th image in this sample and log by different cls
                 tb_dict['image_bev_predicted_cls{}'.format(cls_idx + 1)] = predictions[0, cls_idx]
+                tb_dict['image_bev_projected_pts_cls{}'.format(cls_idx + 1)] = rpn_features[0, cls_idx]
                 tb_dict['image_bev_gt_cls{}'.format(cls_idx + 1)] = gt[0, cls_idx]
 
             ############################## compute iou metrics ##############################
