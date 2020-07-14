@@ -30,7 +30,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
 
         if tb_log is not None:
             tb_log.add_scalar('learning_rate', cur_lr, accumulated_iter)
-            tb_log.add_scalar('epoch', accumulated_iter / total_it_each_epoch, accumulated_iter)
+            tb_log.add_scalar('epoch', accumulated_iter // total_it_each_epoch, accumulated_iter)
 
         model.train()
         optimizer.zero_grad()

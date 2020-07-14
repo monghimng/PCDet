@@ -41,6 +41,9 @@ NAME=bev_moreblocks_11
 NAME=bev_moreblocks_oldloss_12
 NAME=bev_tagbboxpoints_13
 NAME=bev_projected_taggedpoints_17
+NAME=bev_tagpts_usingresenet18_18
+NAME=bev_ptpillar_usingresenet18_20
+NAME=bev_ptpillar_usingresenet18_21
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
@@ -50,13 +53,13 @@ train.py \
 --launcher pytorch \
 --sync_bn \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
---batch_size 24 \
---tcp_port 10004 \
+--batch_size 20 \
+--tcp_port 10008 \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
-MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[30, 60]' \
-MODEL.TRAIN.OPTIMIZATION.LR_WARMUP True \
-MODEL.TRAIN.OPTIMIZATION.LR 0.003 \
+MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[5, 10]' \
+MODEL.TRAIN.OPTIMIZATION.LR 0.0008 \
+MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
 #--epochs 200 \
 #--batch_size 64 \
 #MODEL.TRAIN.OPTIMIZATION.LR 0.0001 \
@@ -69,5 +72,6 @@ notes
 
 << sample_cmds
 cksbatch --nodelist=pavia ~/BEVSEG/PCDet2/scripts/argo/pointpillar_train.sh
+cksbatch --nodelist=como ~/BEVSEG/PCDet2/scripts/argo/pointpillar_train.sh
 bash $CODE/BEVSEG/PCDet2/scripts/argo/pointpillar_train.sh
 sample_cmds

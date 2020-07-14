@@ -51,34 +51,40 @@ class PointPillar(Detector3D):
         # pos_weights = torch.Tensor([1.7736, 28.0409]).cuda() / 2# todo
         pos_weights = torch.Tensor([28.0409]).cuda()
         pos_weights = torch.Tensor([28.0409]).cuda() / 2
+        pos_weights = torch.Tensor([2]).cuda()  # those calculated weights don't seem to work
         self.bev_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
+        # self.bev_loss = nn.BCEWithLogitsLoss()
         # self.bev_loss = nn.L1Loss()
         # self.bev_loss = FocalLoss(alpha=pos_weights, logits=True)
 
-        num_block = 6
-        div_factor_for_channel = (in_channels_bev / out_channels_bev) ** (1 / num_block)
-        print(div_factor_for_channel)
-        blocks = []
+        # num_block = 6
+        # div_factor_for_channel = (in_channels_bev / out_channels_bev) ** (1 / num_block)
+        # print(div_factor_for_channel)
+        # blocks = []
+        #
+        # # todo: this is only for debug
+        # lst = [1, 4, 16, 64, 384]
+        # for ck, in_channels_bev in zip(lst[:-1], lst[1:]):
+        #     blocks.append(nn.Conv2d(ck, in_channels_bev, 3, padding=1))
+        #     blocks.append(nn.BatchNorm2d(in_channels_bev))
+        #     blocks.append(nn.ReLU())
+        # blocks.append((nn.Conv2d(384, 384, 3, stride=2, padding=1)))
+        #
+        # for j in range(num_block):
+        #     in_chan = int(in_channels_bev // (div_factor_for_channel ** j))
+        #     out_chan = int(in_channels_bev // (div_factor_for_channel ** (j + 1)))
+        #     print(out_chan)
+        #     blocks.append(nn.Conv2d(in_chan, out_chan, 1))
+        #     blocks.append(nn.ReLU())
+        #     blocks.append(nn.Conv2d(out_chan, out_chan, 3, padding=1))
+        #     blocks.append(nn.BatchNorm2d(out_chan))
+        #     blocks.append(nn.ReLU())
+        # blocks.append(nn.Conv2d(out_channels_bev, out_channels_bev, 3, padding=1, bias=True))
 
-        # todo: this is only for debug
-        lst = [1, 4, 16, 64, 384]
-        for ck, in_channels_bev in zip(lst[:-1], lst[1:]):
-            blocks.append(nn.Conv2d(ck, in_channels_bev, 3, padding=1))
-            blocks.append(nn.BatchNorm2d(in_channels_bev))
-            blocks.append(nn.ReLU())
-        blocks.append((nn.Conv2d(384, 384, 3, stride=2, padding=1)))
-
-        for j in range(num_block):
-            in_chan = int(in_channels_bev // (div_factor_for_channel ** j))
-            out_chan = int(in_channels_bev // (div_factor_for_channel ** (j + 1)))
-            print(out_chan)
-            blocks.append(nn.Conv2d(in_chan, out_chan, 1))
-            blocks.append(nn.ReLU())
-            blocks.append(nn.Conv2d(out_chan, out_chan, 3, padding=1))
-            blocks.append(nn.BatchNorm2d(out_chan))
-            blocks.append(nn.ReLU())
-        blocks.append(nn.Conv2d(out_channels_bev, out_channels_bev, 3, padding=1, bias=True))
-        self.bev_conv = nn.Sequential(*blocks)
+        import segmentation_models_pytorch as smp
+        self.bev_conv = smp.Unet('resnet18', encoder_weights='imagenet', classes=1)
+        self.bev_conv.encoder.conv1 = nn.Conv2d(384, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        # self.bev_conv = nn.Sequential(*blocks)
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
 
@@ -158,11 +164,14 @@ class PointPillar(Detector3D):
             # obtain bev features in the right output dimension
 
             # opt1: using poitnpillar features
-            # rpn_features = rpn_ret_dict['spatial_features_last']
+            rpn_features = rpn_ret_dict['spatial_features_last']
             # opt2: using projected points # todo this is cheating :D
-            rpn_features = rpn_ret_dict['ck']
+            # rpn_features = rpn_ret_dict['ck']
+            rpn_features = F.interpolate(rpn_features, size=416)
+            # rpn_features = torch.cat([rpn_features, rpn_features, rpn_features], dim=1)  # duplicate 3 times to fit usual rgb images
 
             bev_features = self.bev_conv(rpn_features)
+            bev_features = F.interpolate(bev_features, size=200)
 
             # gt = input_dict['bev'].astype(np.int32) # todo
             gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
