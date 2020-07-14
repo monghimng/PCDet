@@ -24,6 +24,7 @@ train.py \
 --extra_tag debug_$RANDOM \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 --workers 0 \
+--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 
 exit
 fi
@@ -44,6 +45,9 @@ NAME=bev_projected_taggedpoints_17
 NAME=bev_tagpts_usingresenet18_18
 NAME=bev_ptpillar_usingresenet18_20
 NAME=bev_ptpillar_usingresenet18_21
+NAME=1pt5weight
+NAME=frozen_pcdet_layers_usedpretrained_2
+NAME=bilinear_interp
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
@@ -52,14 +56,15 @@ train.py \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
---pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 --batch_size 20 \
---tcp_port 10008 \
+--tcp_port 10005 \
+--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
-MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[5, 10]' \
+MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[10, 20]' \
 MODEL.TRAIN.OPTIMIZATION.LR 0.0008 \
 MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
+--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 #--epochs 200 \
 #--batch_size 64 \
 #MODEL.TRAIN.OPTIMIZATION.LR 0.0001 \

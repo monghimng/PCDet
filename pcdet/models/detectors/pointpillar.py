@@ -52,6 +52,7 @@ class PointPillar(Detector3D):
         pos_weights = torch.Tensor([28.0409]).cuda()
         pos_weights = torch.Tensor([28.0409]).cuda() / 2
         pos_weights = torch.Tensor([2]).cuda()  # those calculated weights don't seem to work
+        pos_weights = torch.Tensor([1.5]).cuda()  # those calculated weights don't seem to work
         self.bev_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
         # self.bev_loss = nn.BCEWithLogitsLoss()
         # self.bev_loss = nn.L1Loss()
@@ -85,6 +86,14 @@ class PointPillar(Detector3D):
         self.bev_conv = smp.Unet('resnet18', encoder_weights='imagenet', classes=1)
         self.bev_conv.encoder.conv1 = nn.Conv2d(384, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         # self.bev_conv = nn.Sequential(*blocks)
+
+        # freeze model to debug
+        for param in self.vfe.parameters():
+            param.requires_grad = False
+        for param in self.rpn_net.parameters():
+            param.requires_grad = False
+        for param in self.rpn_head.parameters():
+            param.requires_grad = False
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
 
@@ -167,11 +176,11 @@ class PointPillar(Detector3D):
             rpn_features = rpn_ret_dict['spatial_features_last']
             # opt2: using projected points # todo this is cheating :D
             # rpn_features = rpn_ret_dict['ck']
-            rpn_features = F.interpolate(rpn_features, size=416)
+            rpn_features = F.interpolate(rpn_features, size=416, mode='bilinear')
             # rpn_features = torch.cat([rpn_features, rpn_features, rpn_features], dim=1)  # duplicate 3 times to fit usual rgb images
 
             bev_features = self.bev_conv(rpn_features)
-            bev_features = F.interpolate(bev_features, size=200)
+            bev_features = F.interpolate(bev_features, size=200, mode='bilinear')
 
             # gt = input_dict['bev'].astype(np.int32) # todo
             gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
