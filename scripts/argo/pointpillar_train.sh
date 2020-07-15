@@ -47,7 +47,8 @@ NAME=bev_ptpillar_usingresenet18_20
 NAME=bev_ptpillar_usingresenet18_21
 NAME=1pt5weight
 NAME=frozen_pcdet_layers_usedpretrained_2
-NAME=bilinear_interp
+NAME=bilinear_interp_e2e_nopretrain
+#NAME=bilinear_interp_e2e_nopretrain_withwarmup
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
@@ -56,15 +57,15 @@ train.py \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
---batch_size 20 \
---tcp_port 10005 \
+--batch_size 28 \
+--tcp_port 10007 \
 --pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
 MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[10, 20]' \
 MODEL.TRAIN.OPTIMIZATION.LR 0.0008 \
 MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
---pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
+#--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 #--epochs 200 \
 #--batch_size 64 \
 #MODEL.TRAIN.OPTIMIZATION.LR 0.0001 \
@@ -73,6 +74,8 @@ MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
 batch sizes:
 4 32gb 64
 2 32gb 32
++resnet bs:
+1 32gb = 16
 notes
 
 << sample_cmds

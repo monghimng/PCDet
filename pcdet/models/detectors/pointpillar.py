@@ -88,12 +88,12 @@ class PointPillar(Detector3D):
         # self.bev_conv = nn.Sequential(*blocks)
 
         # freeze model to debug
-        for param in self.vfe.parameters():
-            param.requires_grad = False
-        for param in self.rpn_net.parameters():
-            param.requires_grad = False
-        for param in self.rpn_head.parameters():
-            param.requires_grad = False
+        # for param in self.vfe.parameters():
+        #     param.requires_grad = False
+        # for param in self.rpn_net.parameters():
+        #     param.requires_grad = False
+        # for param in self.rpn_head.parameters():
+        #     param.requires_grad = False
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
 
