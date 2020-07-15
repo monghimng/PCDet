@@ -64,6 +64,10 @@ class BaseKittiDataset(DatasetTemplate):
         Get the bird's eye view segmentation ground truths. The variable `classes` contain
         all the classes the model will predict. `DRIVABLE` means drivable region, and are
         allowed to overlap with other object types such as `VEHICLE` and `PEDESTRIAN`.
+
+        Note that the car forward dir is considered the rows of the image, while going left
+        and right is the columns of the image.
+
         Args:
             idx (): the sample idx of this training example, eg, 000001
 
@@ -73,11 +77,16 @@ class BaseKittiDataset(DatasetTemplate):
         classes = ['DRIVABLE', 'VEHICLE']
         bevs = []
 
-        bnds = np.array([-25, 25, -25, 25])
+        # NOTE: this follows the coorindate of image, where  the x dir
+        # is the vertical pos dir going from top to down,
+        # while the y dir is the  horizontal pos dir going from left to the right
+
+        bnds = np.array([-25, 25, -25, 25])  # min x, max x, min y, max y
+        bnds = np.array([-50, 0, -25, 25])  # min x, max x, min y, max y
+
         meter_per_pixel = 0.25
         pixel_bnds = bnds / meter_per_pixel
         pixel_bnds = pixel_bnds.astype(np.int)
-
 
         for cls in classes:
             bev_path = os.path.join(self.root_split_path, 'bev_{}'.format(cls), '%s.png' % idx)

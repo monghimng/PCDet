@@ -49,16 +49,18 @@ NAME=1pt5weight
 NAME=frozen_pcdet_layers_usedpretrained_2
 NAME=bilinear_interp_e2e_nopretrain
 #NAME=bilinear_interp_e2e_nopretrain_withwarmup
+NAME=bev_2cls_0
+NAME=bev_forward50meter_1
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
 train.py \
---cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
+--cfg_file cfgs/argo/pointpillar_forward50x50.yaml \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
 --batch_size 28 \
---tcp_port 10007 \
+--tcp_port 10001 \
 --pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \

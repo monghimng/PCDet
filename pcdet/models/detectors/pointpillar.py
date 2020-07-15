@@ -46,15 +46,15 @@ class PointPillar(Detector3D):
 
         # bev conv
         in_channels_bev = 384
-        out_channels_bev = 1 #todo
+        out_channels_bev = 2 #todo
         # this was calculated by counting number of positive pixels for each cls
         # pos_weights = torch.Tensor([1.7736, 28.0409]).cuda() / 2# todo
         pos_weights = torch.Tensor([28.0409]).cuda()
         pos_weights = torch.Tensor([28.0409]).cuda() / 2
         pos_weights = torch.Tensor([2]).cuda()  # those calculated weights don't seem to work
         pos_weights = torch.Tensor([1.5]).cuda()  # those calculated weights don't seem to work
-        self.bev_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
-        # self.bev_loss = nn.BCEWithLogitsLoss()
+        # self.bev_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
+        self.bev_loss = nn.BCEWithLogitsLoss()
         # self.bev_loss = nn.L1Loss()
         # self.bev_loss = FocalLoss(alpha=pos_weights, logits=True)
 
@@ -83,7 +83,7 @@ class PointPillar(Detector3D):
         # blocks.append(nn.Conv2d(out_channels_bev, out_channels_bev, 3, padding=1, bias=True))
 
         import segmentation_models_pytorch as smp
-        self.bev_conv = smp.Unet('resnet18', encoder_weights='imagenet', classes=1)
+        self.bev_conv = smp.Unet('resnet18', encoder_weights='imagenet', classes=out_channels_bev)
         self.bev_conv.encoder.conv1 = nn.Conv2d(384, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         # self.bev_conv = nn.Sequential(*blocks)
 
@@ -168,7 +168,7 @@ class PointPillar(Detector3D):
         if self.training:
 
             ############################## compute loss #############################
-            num_classes = 1
+            num_classes = 2
 
             # obtain bev features in the right output dimension
 
@@ -182,8 +182,8 @@ class PointPillar(Detector3D):
             bev_features = self.bev_conv(rpn_features)
             bev_features = F.interpolate(bev_features, size=200, mode='bilinear')
 
-            # gt = input_dict['bev'].astype(np.int32) # todo
-            gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
+            gt = input_dict['bev'].astype(np.int32)
+            # gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
 
             gt = np.transpose(gt, [0, 1, 3, 2])
             gt = gt[:, :, ::-1, ::-1]
