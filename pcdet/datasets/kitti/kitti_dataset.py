@@ -49,6 +49,54 @@ class BaseKittiDataset(DatasetTemplate):
         assert os.path.exists(lidar_file)
         return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
 
+    def get_colored_lidar(self, idx):
+        """
+        Returns a point cloud with each pt containing not only the xyz (for now no reflectance)
+        but also the color of its projection onto the image.
+        Args:
+            idx (): 
+
+        Returns:
+            colored_pts: (n, 3 + 3), where the 6 are xyz + rgb
+        """
+        # get the lidar
+        lidar_file = os.path.join(self.root_split_path, 'velodyne', '%s.bin' % idx)
+        assert os.path.exists(lidar_file)
+        pts = np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
+        pts = pts[:, :3]
+
+        # get the image
+        img_file = os.path.join(self.root_split_path, 'image_2', '%s.png' % idx)
+        assert os.path.exists(img_file)
+        img = np.array(io.imread(img_file), dtype=np.int32)
+        img_shape = img.shape  # should be (heigth, width)
+
+        # get the calibration
+        calib_file = os.path.join(self.root_split_path, 'calib', '%s.txt' % idx)
+        assert os.path.exists(calib_file)
+        calib = calibration.Calibration(calib_file)
+
+        # filter out points that are not within image fov
+        pts_rect = calib.lidar_to_rect(pts[:, :3])  # get_fov_flag only works with rect coord sys
+        fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
+        pts_fov = pts[fov_flag]
+
+        # project pts onto image to get the point color
+        img_coords, _ = calib.lidar_to_img(pts_fov[:, :3])
+        img_coords = img_coords.astype(np.int)  # note that first col is the cols, second col is the rows
+        rows = img_coords[:, 1]
+        cols = img_coords[:, 0]
+        colors = img[rows, cols]
+
+        # todo: potential way to play with the semantics
+        colors = colors.astype(np.float32)
+        # colors /= 255  # normalize to [0, 1]
+        colors *= 0
+
+        # append each pt with its color
+        colored_pts = np.hstack([pts_fov, colors])
+        return colored_pts
+
     def get_image_shape(self, idx):
         """
         Obtain the image shape of image_2
@@ -594,7 +642,8 @@ class KittiDataset(BaseKittiDataset):
 
         sample_idx = info['point_cloud']['lidar_idx']
 
-        points = self.get_lidar(sample_idx)
+        # points = self.get_lidar(sample_idx)
+        points = self.get_colored_lidar(sample_idx)
         calib = self.get_calib(sample_idx)
 
         img_shape = info['image']['image_shape']

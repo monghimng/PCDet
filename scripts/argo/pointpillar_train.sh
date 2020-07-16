@@ -19,7 +19,7 @@ if [ "$DEBUG" = true ] ; then
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
 python \
 train.py \
---cfg_file cfgs/argo/pointpillar_centered50x50.yaml \
+--cfg_file cfgs/argo/pointpillar_forward50x50.yaml \
 --batch_size 2 \
 --extra_tag debug_$RANDOM \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
@@ -51,6 +51,9 @@ NAME=bilinear_interp_e2e_nopretrain
 #NAME=bilinear_interp_e2e_nopretrain_withwarmup
 NAME=bev_2cls_0
 NAME=bev_forward50meter_1
+NAME=bev_ptswithrgb_2
+NAME=bev_ptswithrgb_normalized_2
+NAME=bev_zeroed_out_3
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=2 \
@@ -59,14 +62,14 @@ train.py \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
---batch_size 28 \
---tcp_port 10001 \
---pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
+--batch_size 26 \
+--tcp_port 10004 \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
-MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[10, 20]' \
+MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[15, 30]' \
 MODEL.TRAIN.OPTIMIZATION.LR 0.0008 \
 MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
+#--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 #--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 #--epochs 200 \
 #--batch_size 64 \

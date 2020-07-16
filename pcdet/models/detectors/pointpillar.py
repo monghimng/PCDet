@@ -10,28 +10,6 @@ from ...utils.metrics import Evaluator
 # for calculating weights in bce losses
 # pos_samples = 0
 # neg_samples = 0
-
-class FocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
-        super(FocalLoss, self).__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-        self.logits = logits
-        self.reduce = reduce
-
-    def forward(self, inputs, targets):
-        if self.logits:
-            BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduce=False)
-        else:
-            BCE_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
-        pt = torch.exp(-BCE_loss)
-        F_loss = self.alpha * (1-pt)**self.gamma * BCE_loss
-
-        if self.reduce:
-            return torch.mean(F_loss)
-        else:
-            return F_loss
-
 class PointPillar(Detector3D):
     """
     PointPillar network from https://arxiv.org/abs/1812.05784. This is a 1 stage detector consisted of
@@ -84,7 +62,7 @@ class PointPillar(Detector3D):
 
         import segmentation_models_pytorch as smp
         self.bev_conv = smp.Unet('resnet18', encoder_weights='imagenet', classes=out_channels_bev)
-        self.bev_conv.encoder.conv1 = nn.Conv2d(384, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        self.bev_conv.encoder.conv1 = nn.Conv2d(in_channels_bev, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         # self.bev_conv = nn.Sequential(*blocks)
 
         # freeze model to debug
@@ -97,15 +75,15 @@ class PointPillar(Detector3D):
 
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
 
-        v = voxels.detach()
-        v = v.reshape([v.shape[0], -1])
-        self.rpn_net.nchannels = 128
-        vv = self.rpn_net( v, coordinates, batch_size, output_shape=self.grid_size[::-1] )
-        self.rpn_net.nchannels = 64
-        vv = vv.reshape([vv.shape[0], 32, 4, vv.shape[-2], vv.shape[-1]])
-        tag_only = vv[:, :, 3, :, :]
-        aggregated = tag_only.max(dim=1)[0]
-        aggregated = torch.unsqueeze(aggregated, dim=1)
+        # v = voxels.detach()
+        # v = v.reshape([v.shape[0], -1])
+        # self.rpn_net.nchannels = 128
+        # vv = self.rpn_net(v, coordinates, batch_size, output_shape=self.grid_size[::-1])
+        # self.rpn_net.nchannels = 64
+        # vv = vv.reshape([vv.shape[0], 32, 4, vv.shape[-2], vv.shape[-1]])
+        # tag_only = vv[:, :, 3, :, :]
+        # aggregated = tag_only.max(dim=1)[0]
+        # aggregated = torch.unsqueeze(aggregated, dim=1)
 
 
 
@@ -129,9 +107,6 @@ class PointPillar(Detector3D):
             'rpn_dir_cls_preds': rpn_preds_dict.get('dir_cls_preds', None),
             'anchors': rpn_preds_dict['anchors'],
             'spatial_features_last': rpn_preds_dict['spatial_features_last'],
-
-            # todo
-            'ck': aggregated,
         }
         return rpn_ret_dict
 
@@ -281,3 +256,23 @@ class PointPillar(Detector3D):
         loss = loss_rpn
         return loss, tb_dict, disp_dict
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.logits = logits
+        self.reduce = reduce
+
+    def forward(self, inputs, targets):
+        if self.logits:
+            BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduce=False)
+        else:
+            BCE_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
+        pt = torch.exp(-BCE_loss)
+        F_loss = self.alpha * (1-pt)**self.gamma * BCE_loss
+
+        if self.reduce:
+            return torch.mean(F_loss)
+        else:
+            return F_loss
