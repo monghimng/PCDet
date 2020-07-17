@@ -63,4 +63,7 @@ cfg.ROOT_DIR = (Path(__file__).resolve().parent / '../').resolve()
 cfg.LOCAL_RANK = 0
 
 # default flags
-
+cfg.TAG_PTS_WITH_RGB = False
+cfg.VOXELIZE_IN_MODEL_FORWARD = False
+cfg.MODE = '3dobjdet'
+cfg.ALTERNATE_PT_CLOUD_ABS_DIR = '/data/ck/data/kitti_pl2/sdn_kitti_train_set_sparse'

@@ -156,7 +156,7 @@ class DatasetTemplate(torch_data.Dataset):
         
         # in new version of code, we allow the option to voxelize in forward pass so that
         # we can inject semantic features or making pseudolidar differentiable
-        if not cfg.DATA_CONFIG.VOXEL_GENERATOR.VOXELIZE_IN_MODEL_FORWARD:
+        if not cfg.VOXELIZE_IN_MODEL_FORWARD:
             voxel_grid = self.voxel_generator.generate(points)
 
             # Support spconv 1.0 and 1.1
@@ -190,7 +190,7 @@ class DatasetTemplate(torch_data.Dataset):
 
             if 'TARGET_CONFIG' in cfg.MODEL.RPN.BACKBONE \
                 and cfg.MODEL.RPN.BACKBONE.TARGET_CONFIG.GENERATED_ON == 'dataset':
-                if cfg.DATA_CONFIG.VOXEL_GENERATOR.VOXELIZE_IN_MODEL_FORWARD:
+                if cfg.VOXELIZE_IN_MODEL_FORWARD:
                     raise Exception("Haven't gotten the time to fix this with voxelize_in_forward")
                 seg_labels, part_labels, bbox_reg_labels = \
                     self.generate_voxel_part_targets(voxel_centers, gt_boxes, gt_classes)

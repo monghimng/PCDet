@@ -36,7 +36,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         model.train()
         optimizer.zero_grad()
         
-        if cfg.DATA_CONFIG.VOXEL_GENERATOR.VOXELIZE_IN_MODEL_FORWARD:
+        if cfg.VOXELIZE_IN_MODEL_FORWARD:
 
             # things in the batches are still np, the model decorator converts them to pytorch later
             points_batch = batch['points_unmerged']

@@ -45,7 +45,11 @@ class BaseKittiDataset(DatasetTemplate):
         self.__init__(self.root_path, split)
 
     def get_lidar(self, idx):
-        lidar_file = os.path.join(self.root_split_path, 'velodyne', '%s.bin' % idx)
+        if cfg.ALTERNATE_PT_CLOUD_ABS_DIR:
+            lidar_dir = cfg.ALTERNATE_PT_CLOUD_ABS_DIR
+        else:
+             lidar_dir = os.path.join(self.root_split_path, 'velodyne')
+        lidar_file = os.path.join(lidar_dir, '%s.bin' % idx)
         assert os.path.exists(lidar_file)
         return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
 
@@ -60,6 +64,7 @@ class BaseKittiDataset(DatasetTemplate):
             colored_pts: (n, 3 + 3), where the 6 are xyz + rgb
         """
         # get the lidar
+        # todo: call get_lidar instead
         lidar_file = os.path.join(self.root_split_path, 'velodyne', '%s.bin' % idx)
         assert os.path.exists(lidar_file)
         pts = np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
@@ -642,8 +647,10 @@ class KittiDataset(BaseKittiDataset):
 
         sample_idx = info['point_cloud']['lidar_idx']
 
-        # points = self.get_lidar(sample_idx)
-        points = self.get_colored_lidar(sample_idx)
+        if cfg.TAG_PTS_WITH_RGB:
+            points = self.get_colored_lidar(sample_idx)
+        else:
+            points = self.get_lidar(sample_idx)
         calib = self.get_calib(sample_idx)
 
         img_shape = info['image']['image_shape']
@@ -689,9 +696,10 @@ class KittiDataset(BaseKittiDataset):
         example['sample_idx'] = sample_idx
         example['image_shape'] = img_shape
 
-        # add the bev training maps
-        bev = self.get_bev(sample_idx)
-        example['bev'] = bev
+        # add the bev maps if HD map is available (eg, argoverse)
+        if 'bev' in cfg.MODE:
+            bev = self.get_bev(sample_idx)
+            example['bev'] = bev
 
         return example
 
