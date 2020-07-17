@@ -149,6 +149,71 @@ def main():
 
     logger.info('**********************End training**********************')
 
+    '''
+    :param images: set of images (rgb images, other form of inputs) to_be_bilinearly_interpolated
+    :param labels: set of images (segmentation maps, depth maps) to be interpolated with nearest neighbor
+    '''
+import cv2
+import numpy as np
+def image_resize(image, long_size, label=None):
+    h, w = image.shape[:2]
+    if h > w:
+        new_h = long_size
+        new_w = np.int(w * long_size / h + 0.5)
+    else:
+        new_w = long_size
+        new_h = np.int(h * long_size / w + 0.5)
 
+    image = cv2.resize(image, (new_w, new_h),
+                       interpolation=cv2.INTER_LINEAR)
+    if label is not None:
+        label = cv2.resize(label, (new_w, new_h),
+                           interpolation=cv2.INTER_NEAREST)
+    else:
+        return image
+
+    return image, label
+def input_transform(image, mean, std):
+    image = image.astype(np.float32)[:, :, ::-1]
+    image = image / 255.0
+    image -= mean
+    image /= std
+    return image
 if __name__ == '__main__':
+    # from hrnet.tools.train import parse_args_and_construct_model
+    # seg_args = ''' --cfg /home/eecs/monghim.ng/BESEG/hrnet/experiments/cityscapes/cityscapes_pcdet.yaml \
+    # MODEL.PRETRAINED /home/eecs/monghim.ng/BESEG/hrnet/hrnet_w48_cityscapes_cls19_1024x2048_trainset.pth \
+    # '''
+    # seg_model = parse_args_and_construct_model(seg_args)
+    # import pdb;pdb.set_trace()
+    #
+    # img_path = '/data/ck/data/argoverse/argoverse-tracking-kitti-format/training/image_2/000000000.png'
+    # img_path = '/data/ck/data/argoverse/argoverse-tracking-kitti-format/training/image_2/000000000.png'
+    # img_path = '/home/eecs/monghim.ng/transfer/aachen_000000_000019_leftImg8bit.png'
+    # img = cv2.imread(img_path)
+    #
+    # # cityscapes image preprocessing: resize, normalize
+    # long_size = 1024
+    # img = image_resize(img, long_size)
+    # shape = img.shape
+    #
+    # mean = np.array([0.485, 0.456, 0.406])
+    # std = np.array([0.229, 0.224, 0.225])
+    # img = input_transform(img, mean, std)
+    # img = img.transpose((2, 0, 1))
+    #
+    # batch = [img]
+    # batch_tensor = torch.Tensor(batch)
+    # pred_batch = seg_model(batch_tensor)
+    # pred_batch = F.upsample(input=pred_batch, size=shape[:2], mode='bilinear')
+    #
+    # pred_batch = pred_batch.argmax(dim=1)
+    # pred = pred_batch[0]
+    #
+    # pred = pred.detach().cpu().numpy().astype(np.int32)
+    # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet.png', pred)
+    # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet2.png', pred)
+
+
+    import torch.nn.functional as F
     main()

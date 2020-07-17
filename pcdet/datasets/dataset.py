@@ -152,23 +152,34 @@ class DatasetTemplate(torch_data.Dataset):
         if cfg.DATA_CONFIG[self.mode].SHUFFLE_POINTS:
             np.random.shuffle(points)
 
-        voxel_grid = self.voxel_generator.generate(points)
+        example = {}
+        
+        # in new version of code, we allow the option to voxelize in forward pass so that
+        # we can inject semantic features or making pseudolidar differentiable
+        if not cfg.DATA_CONFIG.VOXEL_GENERATOR.VOXELIZE_IN_MODEL_FORWARD:
+            voxel_grid = self.voxel_generator.generate(points)
 
-        # Support spconv 1.0 and 1.1
-        try:
-            voxels, coordinates, num_points = voxel_grid
-        except:
-            voxels = voxel_grid["voxels"]
-            coordinates = voxel_grid["coordinates"]
-            num_points = voxel_grid["num_points_per_voxel"]
+            # Support spconv 1.0 and 1.1
+            try:
+                voxels, coordinates, num_points = voxel_grid
+            except:
+                voxels = voxel_grid["voxels"]
+                coordinates = voxel_grid["coordinates"]
+                num_points = voxel_grid["num_points_per_voxel"]
 
-        voxel_centers = (coordinates[:, ::-1] + 0.5) * self.voxel_generator.voxel_size \
-                        + self.voxel_generator.point_cloud_range[0:3]
+            voxel_centers = (coordinates[:, ::-1] + 0.5) * self.voxel_generator.voxel_size \
+                            + self.voxel_generator.point_cloud_range[0:3]
+
+            example.update({
+                'voxels': voxels,
+                'num_points': num_points,
+                'coordinates': coordinates,
+                'voxel_centers': voxel_centers,
+            })
 
         if cfg.DATA_CONFIG.MASK_POINTS_BY_RANGE:
             points = common_utils.mask_points_by_range(points, cfg.DATA_CONFIG.POINT_CLOUD_RANGE)
 
-        example = {}
         if has_label:
             if not self.training:
                 # for eval_utils
@@ -179,6 +190,8 @@ class DatasetTemplate(torch_data.Dataset):
 
             if 'TARGET_CONFIG' in cfg.MODEL.RPN.BACKBONE \
                 and cfg.MODEL.RPN.BACKBONE.TARGET_CONFIG.GENERATED_ON == 'dataset':
+                if cfg.DATA_CONFIG.VOXEL_GENERATOR.VOXELIZE_IN_MODEL_FORWARD:
+                    raise Exception("Haven't gotten the time to fix this with voxelize_in_forward")
                 seg_labels, part_labels, bbox_reg_labels = \
                     self.generate_voxel_part_targets(voxel_centers, gt_boxes, gt_classes)
                 example['seg_labels'] = seg_labels
@@ -193,10 +206,6 @@ class DatasetTemplate(torch_data.Dataset):
             })
 
         example.update({
-            'voxels': voxels,
-            'num_points': num_points,
-            'coordinates': coordinates,
-            'voxel_centers': voxel_centers,
             'calib': input_dict['calib'],
             'points': points
         })
@@ -265,7 +274,9 @@ class DatasetTemplate(torch_data.Dataset):
             elif key in ['coordinates', 'points']:
                 coors = []
                 for i, coor in enumerate(elems):
-                    coor_pad = np.pad(coor, ((0, 0), (1, 0)), mode='constant', constant_values=i)
+                    # top_row, bottom_row, rightmost col are zero, while leftmost col padding of 1
+                    pad_width = ((0, 0), (1, 0))
+                    coor_pad = np.pad(coor, pad_width, mode='constant', constant_values=i)
                     coors.append(coor_pad)
                 ret[key] = np.concatenate(coors, axis=0)
             elif key in ['gt_boxes']:
@@ -280,4 +291,7 @@ class DatasetTemplate(torch_data.Dataset):
             else:
                 ret[key] = np.stack(elems, axis=0)
         ret['batch_size'] = batch_list.__len__()
+
+        # don't merge points should we want to voxelize later
+        ret['points_unmerged'] = example_merged['points']
         return ret
