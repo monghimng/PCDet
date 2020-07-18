@@ -17,6 +17,33 @@ import cv2
 import pathlib
 
 
+import cv2
+import numpy as np
+def image_resize(image, long_size, label=None):
+    h, w = image.shape[:2]
+    if h > w:
+        new_h = long_size
+        new_w = np.int(w * long_size / h + 0.5)
+    else:
+        new_w = long_size
+        new_h = np.int(h * long_size / w + 0.5)
+
+    image = cv2.resize(image, (new_w, new_h),
+                       interpolation=cv2.INTER_LINEAR)
+    if label is not None:
+        label = cv2.resize(label, (new_w, new_h),
+                           interpolation=cv2.INTER_NEAREST)
+    else:
+        return image
+
+    return image, label
+def input_transform(image, mean, std):
+    image = image.astype(np.float32)[:, :, ::-1]
+    image = image / 255.0
+    image -= mean
+    image /= std
+    return image
+
 class BaseKittiDataset(DatasetTemplate):
     def __init__(self, root_path, split='train'):
         """
@@ -45,13 +72,24 @@ class BaseKittiDataset(DatasetTemplate):
         self.__init__(self.root_path, split)
 
     def get_lidar(self, idx):
+
+        # if supplied, use this dir of pts instead. Useful using alternate pseudolidar
         if cfg.ALTERNATE_PT_CLOUD_ABS_DIR:
             lidar_dir = cfg.ALTERNATE_PT_CLOUD_ABS_DIR
         else:
              lidar_dir = os.path.join(self.root_split_path, 'velodyne')
+
         lidar_file = os.path.join(lidar_dir, '%s.bin' % idx)
         assert os.path.exists(lidar_file)
-        return np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
+        lidar = np.fromfile(lidar_file, dtype=np.float32).reshape(-1, 4)
+
+        # if supplied, sparsify the lidar points for experimentations and keep that percentage of pts
+        if cfg.PERCENT_OF_PTS < 100:
+            amount = int(len(lidar) * cfg.PERCENT_OF_PTS / 100)
+            np.random.shuffle(lidar)
+            lidar = lidar[: amount]
+
+        return lidar
 
     def get_colored_lidar(self, idx):
         """
@@ -101,6 +139,16 @@ class BaseKittiDataset(DatasetTemplate):
         # append each pt with its color
         colored_pts = np.hstack([pts_fov, colors])
         return colored_pts
+
+    def get_image(self, idx):
+        """
+        Obtain the image_2
+        :param idx:
+        :return:
+        """
+        img_file = os.path.join(self.root_split_path, 'image_2', '%s.png' % idx)
+        assert os.path.exists(img_file)
+        return np.array(io.imread(img_file))
 
     def get_image_shape(self, idx):
         """
@@ -685,11 +733,11 @@ class KittiDataset(BaseKittiDataset):
             })
 
         # debuggin model; here we cheat by tagging if each point is in the object bbox
-        corners_lidar = box_utils.boxes3d_to_corners3d_lidar(gt_boxes_lidar)
-        for k in range(len(gt_boxes_lidar)):
-            if gt_names[k] == 'Car':
-                flag = box_utils.in_hull(points[:, 0:3], corners_lidar[k])
-                points[flag, 3] = 1
+        # corners_lidar = box_utils.boxes3d_to_corners3d_lidar(gt_boxes_lidar)
+        # for k in range(len(gt_boxes_lidar)):
+        #     if gt_names[k] == 'Car':
+        #         flag = box_utils.in_hull(points[:, 0:3], corners_lidar[k])
+        #         points[flag, 3] = 1
         input_dict['points'] = points
 
         example = self.prepare_data(input_dict=input_dict, has_label='annos' in info)
@@ -700,6 +748,19 @@ class KittiDataset(BaseKittiDataset):
         if 'bev' in cfg.MODE:
             bev = self.get_bev(sample_idx)
             example['bev'] = bev
+
+        # if cfg.INJECT_SEMANTICS:
+        #     img = self.get_image(sample_idx)
+        #
+        #     # preprocessing for the image to work for hrnet which works on cityscapes
+        #     # long_size = 2048
+        #     # img = image_resize(img, long_size)
+        #     mean = np.array([0.485, 0.456, 0.406])
+        #     std = np.array([0.229, 0.224, 0.225])
+        #     img = input_transform(img, mean, std)  # normalize wrt to imagenet
+        #     img = img.transpose((2, 0, 1))  # change dim ordering to c, h, w for torch
+        #
+        #     example['img'] = img
 
         return example
 

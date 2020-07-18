@@ -19,6 +19,9 @@ rm -r /data/ck/data/argoverse/argoverse-tracking-kitti-format/
 rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ pavia como
 rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ r11 pavia
 
+rsync_local_data_to_remote_data /data/ck/data/kitti_obj_bts_pred/result_bts_eigen_v2_pytorch_densenet161/training/ r11 flaminio
+rsync_local_data_to_remote_data /data/ck/data/kitti_obj_det r11 flaminio
+rsync_local_data_to_remote_data /data/ck/data/kitti_pcdet r11 flaminio
 # locally
 #git remote add upstream https://github.com/sshaoshuai/PCDet.git
 

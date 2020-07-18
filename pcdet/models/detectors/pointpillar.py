@@ -73,6 +73,25 @@ class PointPillar(Detector3D):
         # for param in self.rpn_head.parameters():
         #     param.requires_grad = False
 
+        # if true, initialize a segmentation model to inject semantic features
+        # if cfg.INJECT_SEMANTICS:
+        #     import pdb;
+        #     pdb.set_trace()
+        #     from hrnet.tools.train import parse_args_and_construct_model
+        #     seg_args = ''' --cfg /home/eecs/monghim.ng/BESEG/hrnet/experiments/cityscapes/cityscapes_pcdet.yaml \
+        #     MODEL.PRETRAINED /home/eecs/monghim.ng/BESEG/hrnet/hrnet_w48_cityscapes_cls19_1024x2048_trainset.pth \
+        #     '''
+        #     self.seg_model = parse_args_and_construct_model(seg_args)
+        #     self.seg_model.eval()
+
+        # pred_batch = seg_model(batch_tensor)
+        # pred_batch = F.upsample(input=pred_batch, size=shape[:2], mode='bilinear')
+        #
+        # pred_batch = pred_batch.argmax(dim=1)
+        # pred = pred_batch[0]
+        #
+        # pred = pred.detach().cpu().numpy().astype(np.int32)
+
     def forward_rpn(self, voxels, num_points, coordinates, batch_size, voxel_centers, **kwargs):
 
         # v = voxels.detach()
