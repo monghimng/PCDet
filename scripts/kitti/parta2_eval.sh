@@ -12,8 +12,12 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 # name for the experiments
 NAME=parta2_lidar_1
-NAME=parta2_lidar_noaug_0
+#NAME=parta2_lidar_noaug_0
 #NAME=parta2_lidar_pl2_0
+NAME=parta2_mono_0
+NAME=parta2_lidar_pl2_gttaged_0
+NAME=parta2_mono_gttagged_0
+
 
 CKPT=6
 
@@ -28,6 +32,8 @@ test.py \
 DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
+TAG_PTS_IF_IN_GT_BBOXES True \
+ALTERNATE_PT_CLOUD_ABS_DIR '/data/ck/data/kitti_obj_bts_pred/result_bts_eigen_v2_pytorch_densenet161/training/plidar_sparsified' \
 #ALTERNATE_PT_CLOUD_ABS_DIR '/data/ck/data/kitti_pl2/sdn_kitti_train_set_sparse' \
 #--ckpt /data/ck/BEVSEG/PCDet2/output/PartA2_car/$NAME/ckpt/checkpoint_epoch_$CKPT.pth \
 

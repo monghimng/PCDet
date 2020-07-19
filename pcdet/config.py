@@ -68,4 +68,8 @@ cfg.VOXELIZE_IN_MODEL_FORWARD = False
 cfg.MODE = '3dobjdet'
 cfg.ALTERNATE_PT_CLOUD_ABS_DIR = ''  # default to empty str which represents False
 cfg.PERCENT_OF_PTS = 100  # by default, use all of the points
+cfg.TAG_PTS_IF_IN_GT_BBOXES = False
+
 cfg.INJECT_SEMANTICS = False
+cfg.INJECT_SEMANTICS_HEIGHT = 0
+cfg.INJECT_SEMANTICS_WIDTH = 0

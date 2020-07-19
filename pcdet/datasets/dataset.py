@@ -153,10 +153,13 @@ class DatasetTemplate(torch_data.Dataset):
             np.random.shuffle(points)
 
         example = {}
-        
+
         # in new version of code, we allow the option to voxelize in forward pass so that
-        # we can inject semantic features or making pseudolidar differentiable
-        if not cfg.VOXELIZE_IN_MODEL_FORWARD:
+        # we can inject semantic features or making pseudolidar differentiable, but here
+        # we sometimes voxelize one more time because parta2 requires it for auxiliary loss
+        requires_auxiliary_loss = 'TARGET_CONFIG' in cfg.MODEL.RPN.BACKBONE \
+                and cfg.MODEL.RPN.BACKBONE.TARGET_CONFIG.GENERATED_ON == 'dataset'
+        if not cfg.VOXELIZE_IN_MODEL_FORWARD or requires_auxiliary_loss:
             voxel_grid = self.voxel_generator.generate(points)
 
             # Support spconv 1.0 and 1.1
@@ -190,8 +193,6 @@ class DatasetTemplate(torch_data.Dataset):
 
             if 'TARGET_CONFIG' in cfg.MODEL.RPN.BACKBONE \
                 and cfg.MODEL.RPN.BACKBONE.TARGET_CONFIG.GENERATED_ON == 'dataset':
-                if cfg.VOXELIZE_IN_MODEL_FORWARD:
-                    raise Exception("Haven't gotten the time to fix this with voxelize_in_forward")
                 seg_labels, part_labels, bbox_reg_labels = \
                     self.generate_voxel_part_targets(voxel_centers, gt_boxes, gt_classes)
                 example['seg_labels'] = seg_labels

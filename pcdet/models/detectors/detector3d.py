@@ -22,6 +22,17 @@ class Detector3D(nn.Module):
         self.register_buffer('global_step', torch.LongTensor(1).zero_())
 
         self.vfe = self.rpn_net = self.rpn_head = self.rcnn_net = None
+        
+        # if true, initialize a segmentation model to inject semantic features
+        if cfg.INJECT_SEMANTICS:
+            from hrnet.tools.train import parse_args_and_construct_model
+            seg_args = ''' --cfg /home/eecs/monghim.ng/BESEG/hrnet/experiments/cityscapes/cityscapes_pcdet.yaml \
+            MODEL.PRETRAINED /home/eecs/monghim.ng/BESEG/hrnet/hrnet_w48_cityscapes_cls19_1024x2048_trainset.pth \
+            '''
+            self.seg_model = parse_args_and_construct_model(seg_args)
+            self.seg_model.eval()
+            for param in self.seg_model.parameters():
+                param.requires_grad = False
 
     @property
     def mode(self):

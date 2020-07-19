@@ -120,6 +120,7 @@ class BaseKittiDataset(DatasetTemplate):
         calib = calibration.Calibration(calib_file)
 
         # filter out points that are not within image fov
+        # todo: this migth already be done in other preprocesing, but might be later on
         pts_rect = calib.lidar_to_rect(pts[:, :3])  # get_fov_flag only works with rect coord sys
         fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
         pts_fov = pts[fov_flag]
@@ -733,12 +734,14 @@ class KittiDataset(BaseKittiDataset):
             })
 
         # debuggin model; here we cheat by tagging if each point is in the object bbox
-        # corners_lidar = box_utils.boxes3d_to_corners3d_lidar(gt_boxes_lidar)
-        # for k in range(len(gt_boxes_lidar)):
-        #     if gt_names[k] == 'Car':
-        #         flag = box_utils.in_hull(points[:, 0:3], corners_lidar[k])
-        #         points[flag, 3] = 1
-        input_dict['points'] = points
+        if cfg.TAG_PTS_IF_IN_GT_BBOXES:
+            points[:, 3] = 0
+            corners_lidar = box_utils.boxes3d_to_corners3d_lidar(gt_boxes_lidar)
+            for k in range(len(gt_boxes_lidar)):
+                if gt_names[k] == 'Car':
+                    flag = box_utils.in_hull(points[:, 0:3], corners_lidar[k])
+                    points[flag, 3] = 1
+            input_dict['points'] = points
 
         example = self.prepare_data(input_dict=input_dict, has_label='annos' in info)
         example['sample_idx'] = sample_idx
@@ -749,18 +752,28 @@ class KittiDataset(BaseKittiDataset):
             bev = self.get_bev(sample_idx)
             example['bev'] = bev
 
-        # if cfg.INJECT_SEMANTICS:
-        #     img = self.get_image(sample_idx)
-        #
-        #     # preprocessing for the image to work for hrnet which works on cityscapes
-        #     # long_size = 2048
-        #     # img = image_resize(img, long_size)
-        #     mean = np.array([0.485, 0.456, 0.406])
-        #     std = np.array([0.229, 0.224, 0.225])
-        #     img = input_transform(img, mean, std)  # normalize wrt to imagenet
-        #     img = img.transpose((2, 0, 1))  # change dim ordering to c, h, w for torch
-        #
-        #     example['img'] = img
+        if cfg.INJECT_SEMANTICS:
+            # todo: check the ordering of the imagenet mean and std. is it rgb or bgr?
+            img = self.get_image(sample_idx)
+
+            # preprocessing for the image to work for hrnet which works on cityscapes
+
+            # if on kitti (not on argoverse), some of the images don't have the same size,
+            # so we must scale them to the same size, then during voxelization, rescale
+            # to the right size for projecting lidar pts onto image plane to work
+
+            # if the height is not set, then we scale it according to the width
+            if cfg.INJECT_SEMANTICS_HEIGHT == 0:
+                img = image_resize(img, cfg.INJECT_SEMANTICS_WIDTH)
+            else:
+                img = cv2.resize(img, (cfg.INJECT_SEMANTICS_WIDTH, cfg.INJECT_SEMANTICS_HEIGHT),
+                                   interpolation=cv2.INTER_LINEAR)
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            img = input_transform(img, mean, std)  # normalize wrt to imagenet
+            img = img.transpose((2, 0, 1))  # change dim ordering to c, h, w for torch
+
+            example['img'] = img
 
         return example
 

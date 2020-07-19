@@ -1,3 +1,4 @@
+import torch.nn.functional as F
 import torch
 import os
 import glob
@@ -5,6 +6,7 @@ import tqdm
 from torch.nn.utils import clip_grad_norm_
 import wandb
 from pcdet.config import cfg
+import cv2
 
 
 def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, accumulated_iter, optim_cfg,
@@ -35,7 +37,56 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
 
         model.train()
         optimizer.zero_grad()
-        
+
+        if cfg.INJECT_SEMANTICS:
+            import numpy as np  # todo: for some reason, error is thrown if this line is at the top
+            img = batch['img']
+            image_shape = img.shape[2:]
+            device = torch.cuda.current_device()
+            img = torch.tensor(img, dtype=torch.float32, device=device)
+
+            pred_batch = model.module.seg_model(img)
+            # pred_batch = model.seg_model(img)  # if not using distrivurted
+
+            # todo: try nearest neighbor when we pass features down because those might be more accuracte probabilities
+            pred_batch = F.upsample(input=pred_batch, size=list(image_shape), mode='bilinear')
+
+            # todo:
+            # argmax strategy
+            pred_batch = pred_batch.argmax(dim=1, keepdim=True)
+            pred_batch = pred_batch == 13  # convert to binary mask for cars for now
+            pred_batch = pred_batch.permute(0, 2, 3, 1).int().detach().cpu().numpy()
+            # probability distribution strategy
+            # logits strategy
+            # pred_batch = pred_batch.permute(0, 2, 3, 1).detach().cpu().numpy()  # 19 class channels
+            # cfg.DATA_CONFIG.NUM_POINT_FEATURES['total'] = 3 + 19
+            # cfg.DATA_CONFIG.NUM_POINT_FEATURES['use'] = 3 + 19
+
+            # project pts onto image to get the point color
+            semantic_pts_lst = []
+            for pts, segmentation, calib, img_true_size in zip(batch['points_unmerged'], pred_batch, batch['calib'], batch['image_shape']):
+
+                # in kitti, each image could be of different size, we must resize segmentation to the right size
+                true_h, true_w = img_true_size
+                segmentation = cv2.resize(segmentation, (true_w, true_h),
+                                 interpolation=cv2.INTER_NEAREST)
+                segmentation = segmentation.reshape([true_h, true_w, -1])
+                pts = pts[:, :3]  # only take xyz
+                img_coords, _ = calib.lidar_to_img(pts)
+                img_coords = img_coords.astype(np.int32)  # note that first col is the cols, second col is the rows
+                rows = img_coords[:, 1]
+                cols = img_coords[:, 0]
+                semantics = segmentation[rows, cols]
+
+                # todo: potential way to play with the semantics
+                semantics = semantics.astype(np.float32)
+                # semantics /= 255  # normalize to [0, 1]
+
+                # append each pt with its semantics
+                semantic_pts = np.hstack([pts, semantics])
+                semantic_pts_lst.append(semantic_pts)
+            batch['points_unmerged'] = np.array(semantic_pts_lst)
+
         if cfg.VOXELIZE_IN_MODEL_FORWARD:
 
             # things in the batches are still np, the model decorator converts them to pytorch later
@@ -46,13 +97,9 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             example_merged = defaultdict(list)
             for points in points_batch:
                 voxel_grid = voxel_generator.generate(points)
-                # Support spconv 1.0 and 1.1
-                try:
-                    voxels, coordinates, num_points = voxel_grid
-                except:
-                    voxels = voxel_grid["voxels"]
-                    coordinates = voxel_grid["coordinates"]
-                    num_points = voxel_grid["num_points_per_voxel"]
+                voxels = voxel_grid["voxels"]
+                coordinates = voxel_grid["coordinates"]
+                num_points = voxel_grid["num_points_per_voxel"]
 
                 voxel_centers = (coordinates[:, ::-1] + 0.5) * voxel_generator.voxel_size \
                                 + voxel_generator.point_cloud_range[0:3]
@@ -86,8 +133,10 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                     ret[key] = batch_gt_boxes3d
                 else:
                     ret[key] = np.stack(elems, axis=0)
+                # check if they are the same
+                # import pdb; pdb.set_trace()
+                # batch['voxels'][:, :, :3] == ret['voxels'][:, :, :3]
             batch.update(ret)
-            print('voxelize in forward')
 
         loss, tb_dict, disp_dict = model_func(model, batch)
 

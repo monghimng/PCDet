@@ -4,7 +4,7 @@
 #SBATCH -n 1
 #SBATCH -t 2-00:00
 #SBATCH --cpus-per-task 48
-#SBATCH  --gres gpu:2
+#SBATCH  --gres gpu:6
 
 
 source ~/.bashrc &> /dev/null
@@ -12,8 +12,8 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
 
-#DEBUG=true
-DEBUG=false
+DEBUG=true
+#DEBUG=false
 
 if [ "$DEBUG" = true ] ; then
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
@@ -27,57 +27,41 @@ train.py \
 --pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 --set \
 MODE bev \
-VOXELIZE_IN_MODEL_FORWARD False \
-#INJECT_SEMANTICS True \
+VOXELIZE_IN_MODEL_FORWARD True \
+INJECT_SEMANTICS True \
+DATA_CONFIG.FOV_POINTS_ONLY True \
+INJECT_SEMANTICS_WIDTH 2048 \
 
 exit
 fi
 
-NAME=argo_ptpillar_centered_adam50x50_9
-NAME=bev_lmbda0.001_5
-NAME=bev_lrsteps_6
-NAME=bev_lrsteps_halvedposweights_7
-NAME=bev_lrsteps_halvedposweights_lr0.03_7
-NAME=bev_vehicle_only_9
-NAME=bev_vehicle_only_halfposweight_9
-NAME=focal_9
-NAME=bev_l1loss_10
-NAME=bev_moreblocks_11
-NAME=bev_moreblocks_oldloss_12
-NAME=bev_tagbboxpoints_13
-NAME=bev_projected_taggedpoints_17
-NAME=bev_tagpts_usingresenet18_18
-NAME=bev_ptpillar_usingresenet18_20
-NAME=bev_ptpillar_usingresenet18_21
-NAME=1pt5weight
-NAME=frozen_pcdet_layers_usedpretrained_2
-NAME=bilinear_interp_e2e_nopretrain
-#NAME=bilinear_interp_e2e_nopretrain_withwarmup
-NAME=bev_2cls_0
-NAME=bev_forward50meter_1
-NAME=bev_ptswithrgb_2
+NAME=debug_$RANDOM
 NAME=bev_ptswithrgb_normalized_2
 NAME=bev_newvoxelization
 NAME=bev_5pct_0
 NAME=bev_50pct_1
 NAME=bev_10pct_1
 NAME=bev_1pct_1
+NAME=bev_semantics_1pct_0
 
 #python \
-python -m torch.distributed.launch --nproc_per_node=2 \
+python -m torch.distributed.launch --nproc_per_node=6 \
 train.py \
 --cfg_file cfgs/argo/pointpillar_forward50x50.yaml \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
---batch_size 26 \
---tcp_port 10020 \
+--batch_size 48 \
+--tcp_port 10030 \
 --set \
 MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
-MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[15, 30]' \
+MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[10, 20]' \
 MODEL.TRAIN.OPTIMIZATION.LR 0.0008 \
 MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
 MODE bev \
+VOXELIZE_IN_MODEL_FORWARD True \
+INJECT_SEMANTICS True \
+DATA_CONFIG.FOV_POINTS_ONLY True \
 PERCENT_OF_PTS 1 \
 #VOXELIZE_IN_MODEL_FORWARD True \
 #--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
@@ -85,6 +69,7 @@ PERCENT_OF_PTS 1 \
 #--epochs 200 \
 #--batch_size 64 \
 #MODEL.TRAIN.OPTIMIZATION.LR 0.0001 \
+
 
 << notes
 batch sizes:

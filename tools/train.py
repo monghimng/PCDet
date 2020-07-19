@@ -187,18 +187,22 @@ if __name__ == '__main__':
     # '''
     # seg_model = parse_args_and_construct_model(seg_args)
     #
-    # img_path = '/data/ck/data/argoverse/argoverse-tracking-kitti-format/training/image_2/000000000.png'
-    # img_path = '/data/ck/data/argoverse/argoverse-tracking-kitti-format/training/image_2/000000000.png'
-    # img_path = '/home/eecs/monghim.ng/transfer/aachen_000000_000019_leftImg8bit.png'
-    # img_path = '/data/ck/data/kitti_obj_det/training/image_2/000000.png'
-    # img_path = '/data/ck/data/kitti_obj_det/training/image_2/001000.png'
+    # # img_path = '/data/ck/data/argoverse/argoverse-tracking-kitti-format/training/image_2/000000000.png'
+    # # img_path = '/data/ck/data/argoverse/argoverse-tracking-kitti-format/training/image_2/000000000.png'
+    # # img_path = '/home/eecs/monghim.ng/transfer/aachen_000000_000019_leftImg8bit.png'
+    # # img_path = '/data/ck/data/kitti_obj_det/training/image_2/000000.png'
+    # # img_path = '/data/ck/data/kitti_obj_det/training/image_2/001000.png'
     # # img_path = '/data/ck/data/kitti_obj_det/training/image_2/002000.png'
     # # img_path = '/data/ck/data/kitti_obj_det/training/image_2/003000.png'
+    # img_path = '/data/ck/data/kitti_obj_det/training/image_2/000600.png'
     # img = cv2.imread(img_path)
+    # print(img.shape)
     #
     # # cityscapes image preprocessing: resize, normalize
-    # long_size = 2048
+    # long_size = 1024
+    # # long_size = 2048
     # # long_size = 1536
+    # long_size = img.shape[1]
     # img = image_resize(img, long_size)
     # shape = img.shape
     #
@@ -221,11 +225,12 @@ if __name__ == '__main__':
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_2.png', pred)
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_3.png', pred)
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_2048res_0.png', pred)
-    # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_2048res_1.png', pred)
+    # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_2048res_1.png', pred)
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_2048res_2.png', pred)
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_2048res_3.png', pred)
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_1536res_2.png', pred)
     # # cv2.imwrite('/home/eecs/monghim.ng/transfer/hrnet_kitti_1536res_1.png', pred)
+    # cv2.imwrite('/home/eecs/monghim.ng/transfer/000600.png', pred)
     # exit()
 
     main()
