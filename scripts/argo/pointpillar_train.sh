@@ -9,8 +9,9 @@
 
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
+#source $ROOT/virtualenv/risep36_testing/bin/activate
 
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
 DEBUG=true
 #DEBUG=false
@@ -28,9 +29,9 @@ train.py \
 --set \
 MODE bev \
 VOXELIZE_IN_MODEL_FORWARD True \
-INJECT_SEMANTICS True \
-DATA_CONFIG.FOV_POINTS_ONLY True \
-INJECT_SEMANTICS_WIDTH 2048 \
+#INJECT_SEMANTICS True \
+#INJECT_SEMANTICS_WIDTH 2048 \
+#DATA_CONFIG.FOV_POINTS_ONLY True \
 
 exit
 fi

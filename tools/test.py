@@ -105,6 +105,9 @@ def repeat_eval_ckpt(model, test_loader, args, eval_output_dir, logger, ckpt_dir
             if total_time > args.max_waiting_mins * 60 and (first_eval is False):
                 break
             continue
+        
+        # even if there is a ckpt, wait a bit for the ckpt to be fully written to disk
+        time.sleep(30)
 
         total_time = 0
         first_eval = False

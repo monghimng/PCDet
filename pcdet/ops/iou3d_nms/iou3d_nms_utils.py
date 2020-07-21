@@ -30,6 +30,8 @@ def boxes_iou3d_gpu(boxes_a, boxes_b):
     :return:
         ans_iou: (M, N)
     """
+    if len(boxes_a) == 0 or len(boxes_b) == 0:
+        print('boxes a and b', len(boxes_a), len(boxes_b))
     boxes_a_bev = box_utils.boxes3d_to_bevboxes_lidar_torch(boxes_a)
     boxes_b_bev = box_utils.boxes3d_to_bevboxes_lidar_torch(boxes_b)
     # height overlap

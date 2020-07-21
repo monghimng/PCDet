@@ -9,6 +9,7 @@
 
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/
+rm -r build  # make sure you removed the old compiled lib
 python setup.py develop
 rm -r kitti/
 ln -s /data/ck/data/kitti_pcdet/kitti $CODE/BEVSEG/PCDet2/data/kitti
@@ -17,6 +18,7 @@ mkdir -p /data/ck/BEVSEG/PCDet2/output/ # write model checkpoints to bigger disk
 ln -s /data/ck/BEVSEG/PCDet2/output/ $CODE/BEVSEG/PCDet2/output
 rm -r /data/ck/data/argoverse/argoverse-tracking-kitti-format/
 rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ pavia como
+rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking r11 flaminio
 rsync_local_data_to_remote_data /data/ck/data/argoverse/argoverse-tracking-kitti-format/ r11 pavia
 
 rsync_local_data_to_remote_data /data/ck/data/kitti_obj_bts_pred/result_bts_eigen_v2_pytorch_densenet161/training/ r11 flaminio

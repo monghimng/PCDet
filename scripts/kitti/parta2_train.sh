@@ -4,7 +4,7 @@
 #SBATCH -n 1
 #SBATCH -t 2-00:00
 #SBATCH --cpus-per-task 48
-#SBATCH  --gres gpu:2
+#SBATCH  --gres gpu:3
 
 
 source ~/.bashrc &> /dev/null
@@ -31,6 +31,7 @@ INJECT_SEMANTICS True \
 INJECT_SEMANTICS_HEIGHT 375 \
 INJECT_SEMANTICS_WIDTH 1240 \
 DATA_CONFIG.FOV_POINTS_ONLY True \
+INJECT_SEMANTICS_MODE 'logit_car_mask' \
 DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
@@ -47,28 +48,32 @@ fi
 #NAME=parta2_mono_0
 #NAME=parta2_lidar_pl2_gttaged_0
 #NAME=parta2_mono_gttagged_0
-NAME=parta2_lidar_semantic_injection
-NAME=parta2_mono_semantic_injection
-NAME=parta2_pl2_semantic_injection
+#NAME=parta2_lidar_semantic_injection_0
+#NAME=parta2_mono_semantic_injection_0
+NAME=carprob
+NAME=parta2_pl2_7
+NAME=parta2_pl2_semantic_injection_3
 
-python -m torch.distributed.launch --nproc_per_node=2 \
+python -m torch.distributed.launch --nproc_per_node=3 \
 train.py \
 --cfg_file cfgs/PartA2_car.yaml \
 --sync_bn \
 --launcher pytorch \
---batch_size 14 \
+--batch_size 21 \
 --extra_tag $NAME \
---tcp_port 11102 \
+--tcp_port 11106 \
+--epochs 200 \
 --set \
-VOXELIZE_IN_MODEL_FORWARD True \
-INJECT_SEMANTICS True \
-INJECT_SEMANTICS_HEIGHT 375 \
-INJECT_SEMANTICS_WIDTH 1240 \
 DATA_CONFIG.FOV_POINTS_ONLY True \
 DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 ALTERNATE_PT_CLOUD_ABS_DIR '/data/ck/data/kitti_pl2/sdn_kitti_train_set_sparse' \
+TORCH_VOXEL_GENERATOR True \
+VOXELIZE_IN_MODEL_FORWARD True \
+INJECT_SEMANTICS True \
+INJECT_SEMANTICS_HEIGHT 375 \
+INJECT_SEMANTICS_WIDTH 1240 \
 #ALTERNATE_PT_CLOUD_ABS_DIR '/data/ck/data/kitti_obj_bts_pred/result_bts_eigen_v2_pytorch_densenet161/training/plidar_sparsified' \
 
 << sample_cmds

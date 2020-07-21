@@ -45,20 +45,26 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             device = torch.cuda.current_device()
             img = torch.tensor(img, dtype=torch.float32, device=device)
 
-            pred_batch = model.module.seg_model(img)
-            # pred_batch = model.seg_model(img)  # if not using distrivurted
+            try:
+                pred_batch = model.module.seg_model(img)
+            except:
+                pred_batch = model.seg_model(img)  # if not using distrivurted
 
             # todo: try nearest neighbor when we pass features down because those might be more accuracte probabilities
             pred_batch = F.upsample(input=pred_batch, size=list(image_shape), mode='bilinear')
 
-            # todo:
-            # argmax strategy
-            pred_batch = pred_batch.argmax(dim=1, keepdim=True)
-            pred_batch = pred_batch == 13  # convert to binary mask for cars for now
-            pred_batch = pred_batch.permute(0, 2, 3, 1).int().detach().cpu().numpy()
+            if cfg.INJECT_SEMANTICS_MODE == 'binary_car_mask':
+                # argmax strategy
+                pred_batch = pred_batch.argmax(dim=1, keepdim=True)
+                pred_batch = pred_batch == 13  # convert to binary mask for cars for now
+                pred_batch = pred_batch.int()
+                pred_batch = pred_batch.permute(0, 2, 3, 1).detach().cpu().numpy()
+            elif cfg.INJECT_SEMANTICS_MODE == 'logit_car_mask':
+                pred_batch = pred_batch[:, 13: 14, :, :]
+                pred_batch = pred_batch.permute(0, 2, 3, 1).detach().cpu().numpy()
+
             # probability distribution strategy
             # logits strategy
-            # pred_batch = pred_batch.permute(0, 2, 3, 1).detach().cpu().numpy()  # 19 class channels
             # cfg.DATA_CONFIG.NUM_POINT_FEATURES['total'] = 3 + 19
             # cfg.DATA_CONFIG.NUM_POINT_FEATURES['use'] = 3 + 19
 
@@ -97,9 +103,20 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             example_merged = defaultdict(list)
             for points in points_batch:
                 voxel_grid = voxel_generator.generate(points)
-                voxels = voxel_grid["voxels"]
                 coordinates = voxel_grid["coordinates"]
                 num_points = voxel_grid["num_points_per_voxel"]
+
+                # instead of performing the actual voxelization, which has to be done in c code to be faster
+                # and therefore indifferentiable, we get only the indices that map a pt to its proper voxel.
+                # This allows gradient to flow through voxelization.
+
+                if cfg.TORCH_VOXEL_GENERATOR:
+                    indices = voxel_grid['voxel_pt_indices_into_original_pt_cloud']
+                    voxels = points[indices]
+                    # -1 in the indices means unmapped pt, thus we zero those out afterward
+                    voxels[indices == -1] = 0
+                else:
+                    voxels = voxel_grid["voxels"]
 
                 voxel_centers = (coordinates[:, ::-1] + 0.5) * voxel_generator.voxel_size \
                                 + voxel_generator.point_cloud_range[0:3]

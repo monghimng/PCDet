@@ -73,3 +73,6 @@ cfg.TAG_PTS_IF_IN_GT_BBOXES = False
 cfg.INJECT_SEMANTICS = False
 cfg.INJECT_SEMANTICS_HEIGHT = 0
 cfg.INJECT_SEMANTICS_WIDTH = 0
+cfg.INJECT_SEMANTICS_MODE = 'binary_car_mask'  # one of binary_car_mask, logit_car_mask
+
+cfg.TORCH_VOXEL_GENERATOR = False
