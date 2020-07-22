@@ -140,6 +140,7 @@ class PointPillar(Detector3D):
     #     return loss, tb_dict, disp_dict
 
     def forward(self, input_dict):
+        # import pdb; pdb.set_trace()
         rpn_ret_dict = self.forward_rpn(**input_dict)
 
         if self.training:

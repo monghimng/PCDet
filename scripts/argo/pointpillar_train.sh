@@ -4,7 +4,7 @@
 #SBATCH -n 1
 #SBATCH -t 2-00:00
 #SBATCH --cpus-per-task 48
-#SBATCH  --gres gpu:6
+#SBATCH  --gres gpu:3
 
 
 source ~/.bashrc &> /dev/null
@@ -13,8 +13,8 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
-DEBUG=true
-#DEBUG=false
+#DEBUG=true
+DEBUG=false
 
 if [ "$DEBUG" = true ] ; then
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
@@ -25,10 +25,19 @@ train.py \
 --extra_tag debug_$RANDOM \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 --workers 0 \
---pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 --set \
 MODE bev \
 VOXELIZE_IN_MODEL_FORWARD True \
+TORCH_VOXEL_GENERATOR True \
+TRAIN_SEMANTIC_NETWORK True \
+INJECT_SEMANTICS True \
+INJECT_SEMANTICS_HEIGHT 375 \
+INJECT_SEMANTICS_WIDTH 1240 \
+DATA_CONFIG.FOV_POINTS_ONLY True \
+INJECT_SEMANTICS_MODE 'logit_car_mask' \
+DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
+DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
+DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 #INJECT_SEMANTICS True \
 #INJECT_SEMANTICS_WIDTH 2048 \
 #DATA_CONFIG.FOV_POINTS_ONLY True \
@@ -43,28 +52,30 @@ NAME=bev_5pct_0
 NAME=bev_50pct_1
 NAME=bev_10pct_1
 NAME=bev_1pct_1
-NAME=bev_semantics_1pct_0
+NAME=e2e_semantics_0
 
 #python \
-python -m torch.distributed.launch --nproc_per_node=6 \
+python -m torch.distributed.launch --nproc_per_node=3 \
 train.py \
 --cfg_file cfgs/argo/pointpillar_forward50x50.yaml \
 --extra_tag $NAME \
 --launcher pytorch \
 --sync_bn \
---batch_size 48 \
+--batch_size 18 \
 --tcp_port 10030 \
 --set \
-MODEL.TRAIN.OPTIMIZATION.OPTIMIZER adam \
-MODEL.TRAIN.OPTIMIZATION.DECAY_STEP_LIST '[10, 20]' \
-MODEL.TRAIN.OPTIMIZATION.LR 0.0008 \
-MODEL.TRAIN.OPTIMIZATION.LR_WARMUP False \
 MODE bev \
 VOXELIZE_IN_MODEL_FORWARD True \
+TORCH_VOXEL_GENERATOR True \
+TRAIN_SEMANTIC_NETWORK True \
 INJECT_SEMANTICS True \
+INJECT_SEMANTICS_HEIGHT 375 \
+INJECT_SEMANTICS_WIDTH 1240 \
 DATA_CONFIG.FOV_POINTS_ONLY True \
-PERCENT_OF_PTS 1 \
-#VOXELIZE_IN_MODEL_FORWARD True \
+INJECT_SEMANTICS_MODE 'logit_car_mask' \
+DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
+DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
+DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 #--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 #--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 #--epochs 200 \
@@ -78,6 +89,7 @@ batch sizes:
 2 32gb 32
 +resnet bs:
 1 32gb = 16
+
 notes
 
 << sample_cmds

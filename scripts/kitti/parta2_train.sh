@@ -11,8 +11,8 @@ source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-6}
 
-#DEBUG=true
-DEBUG=false
+DEBUG=true
+#DEBUG=false
 
 if [ "$DEBUG" = true ] ; then
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
@@ -20,13 +20,13 @@ if [ "$DEBUG" = true ] ; then
 python \
 train.py \
 --cfg_file cfgs/PartA2_car.yaml \
---batch_size 6 \
+--batch_size 2 \
 --extra_tag debug_$RANDOM \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 --workers 0 \
---pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 --set \
 VOXELIZE_IN_MODEL_FORWARD True \
+TORCH_VOXEL_GENERATOR True \
 INJECT_SEMANTICS True \
 INJECT_SEMANTICS_HEIGHT 375 \
 INJECT_SEMANTICS_WIDTH 1240 \
@@ -36,6 +36,7 @@ DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 ALTERNATE_PT_CLOUD_ABS_DIR '/data/ck/data/kitti_obj_bts_pred/result_bts_eigen_v2_pytorch_densenet161/training/plidar_sparsified' \
+#TRAIN_SEMANTIC_NETWORK True \
 #ALTERNATE_PT_CLOUD_ABS_DIR '/data/ck/data/kitti_pl2/sdn_kitti_train_set_sparse' \
 #TAG_PTS_IF_IN_GT_BBOXES True \
 

@@ -58,10 +58,8 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 pred_batch = pred_batch.argmax(dim=1, keepdim=True)
                 pred_batch = pred_batch == 13  # convert to binary mask for cars for now
                 pred_batch = pred_batch.int()
-                pred_batch = pred_batch.permute(0, 2, 3, 1).detach().cpu().numpy()
             elif cfg.INJECT_SEMANTICS_MODE == 'logit_car_mask':
                 pred_batch = pred_batch[:, 13: 14, :, :]
-                pred_batch = pred_batch.permute(0, 2, 3, 1).detach().cpu().numpy()
 
             # probability distribution strategy
             # logits strategy
@@ -72,10 +70,14 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             semantic_pts_lst = []
             for pts, segmentation, calib, img_true_size in zip(batch['points_unmerged'], pred_batch, batch['calib'], batch['image_shape']):
 
-                # in kitti, each image could be of different size, we must resize segmentation to the right size
+                # in kitti, each image could be of different size, we must resize segmentation to the
+                # original size for lifting pseudolidar
                 true_h, true_w = img_true_size
-                segmentation = cv2.resize(segmentation, (true_w, true_h),
-                                 interpolation=cv2.INTER_NEAREST)
+
+                # segmentation = cv2.resize(segmentation, (true_w, true_h),
+                #                  interpolation=cv2.INTER_NEAREST)
+                segmentation = torch.unsqueeze(segmentation, dim=0)
+                segmentation = F.interpolate(segmentation, size=(true_h, true_w))
                 segmentation = segmentation.reshape([true_h, true_w, -1])
                 pts = pts[:, :3]  # only take xyz
                 img_coords, _ = calib.lidar_to_img(pts)
@@ -84,25 +86,22 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 cols = img_coords[:, 0]
                 semantics = segmentation[rows, cols]
 
-                # todo: potential way to play with the semantics
-                semantics = semantics.astype(np.float32)
-                # semantics /= 255  # normalize to [0, 1]
-
                 # append each pt with its semantics
-                semantic_pts = np.hstack([pts, semantics])
+                pts = torch.Tensor(pts).cuda()
+                semantic_pts = torch.cat([pts, semantics], dim=1)
                 semantic_pts_lst.append(semantic_pts)
-            batch['points_unmerged'] = np.array(semantic_pts_lst)
+            batch['points_unmerged'] = semantic_pts_lst
 
         if cfg.VOXELIZE_IN_MODEL_FORWARD:
 
-            # things in the batches are still np, the model decorator converts them to pytorch later
-            points_batch = batch['points_unmerged']
+            points_batch_torch = batch['points_unmerged']
             voxel_generator = train_loader.dataset.voxel_generator
 
             from collections import defaultdict
             example_merged = defaultdict(list)
-            for points in points_batch:
-                voxel_grid = voxel_generator.generate(points)
+            for points_torch in points_batch_torch:
+                points_np = points_torch.detach().cpu().numpy()
+                voxel_grid = voxel_generator.generate(points_np)
                 coordinates = voxel_grid["coordinates"]
                 num_points = voxel_grid["num_points_per_voxel"]
 
@@ -112,7 +111,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
 
                 if cfg.TORCH_VOXEL_GENERATOR:
                     indices = voxel_grid['voxel_pt_indices_into_original_pt_cloud']
-                    voxels = points[indices]
+                    voxels = points_torch[indices]
                     # -1 in the indices means unmapped pt, thus we zero those out afterward
                     voxels[indices == -1] = 0
                 else:
@@ -129,7 +128,10 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             import numpy as np
             ret = {}
             for key, elems in example_merged.items():
-                if key in ['voxels', 'num_points', 'voxel_centers', 'seg_labels', 'part_labels', 'bbox_reg_labels']:
+                if key in ['voxels']:
+                    ret[key] = torch.cat(elems, dim=0)
+                    # import pdb; pdb.set_trace()
+                elif key in ['num_points', 'voxel_centers', 'seg_labels', 'part_labels', 'bbox_reg_labels']:
                     ret[key] = np.concatenate(elems, axis=0)
                 elif key in ['coordinates', 'points']:
                     coors = []

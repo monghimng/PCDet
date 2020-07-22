@@ -44,7 +44,10 @@ def example_convert_to_torch(example, dtype=torch.float32):
     ]
 
     for k, v in example.items():
-        if k in float_names:
+        if k == 'voxels' and cfg.TORCH_VOXEL_GENERATOR:
+            example_torch[k] = v
+            # import pdb; pdb.set_trace()
+        elif k in float_names:
             try:
                 example_torch[k] = torch.tensor(v, dtype=torch.float32, device=device).to(dtype)
             except RuntimeError:
