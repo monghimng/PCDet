@@ -77,3 +77,4 @@ cfg.INJECT_SEMANTICS_MODE = 'binary_car_mask'  # one of binary_car_mask, logit_c
 
 cfg.TORCH_VOXEL_GENERATOR = False
 cfg.TRAIN_SEMANTIC_NETWORK = False
+cfg.SEMANTICS_ZERO_OUT = False

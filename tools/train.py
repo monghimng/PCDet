@@ -118,7 +118,7 @@ def main():
     model.train()  # before wrap to DistributedDataParallel to support fixed some parameters
     if dist_train:
         model = nn.parallel.DistributedDataParallel(model, device_ids=[cfg.LOCAL_RANK % torch.cuda.device_count()],
-            # find_unused_parameters=True # uncomment this line to debug unused params
+            find_unused_parameters=True # uncomment this line to debug unused params
         )
     logger.info(model)
 

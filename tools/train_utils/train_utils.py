@@ -17,6 +17,18 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
     if rank == 0:
         pbar = tqdm.tqdm(total=total_it_each_epoch, leave=leave_pbar, desc='train', dynamic_ncols=True)
 
+    if cfg.INJECT_SEMANTICS:
+        try:
+            seg_model = model.module.seg_model
+        except:
+            seg_model = model.seg_model
+        
+    model.train()
+    if not cfg.TRAIN_SEMANTIC_NETWORK:
+        seg_model.eval()
+        for param in seg_model.parameters():
+            param.requires_grad = False
+
     for cur_it in range(total_it_each_epoch):
         try:
             batch = next(dataloader_iter)
@@ -35,7 +47,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             tb_log.add_scalar('learning_rate', cur_lr, accumulated_iter)
             tb_log.add_scalar('epoch', accumulated_iter // total_it_each_epoch, accumulated_iter)
 
-        model.train()
+        # print(seg_model.last_layer[0].weight.grad)
         optimizer.zero_grad()
 
         if cfg.INJECT_SEMANTICS:
@@ -45,10 +57,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             device = torch.cuda.current_device()
             img = torch.tensor(img, dtype=torch.float32, device=device)
 
-            try:
-                pred_batch = model.module.seg_model(img)
-            except:
-                pred_batch = model.seg_model(img)  # if not using distrivurted
+            pred_batch = seg_model(img)
 
             # todo: try nearest neighbor when we pass features down because those might be more accuracte probabilities
             pred_batch = F.upsample(input=pred_batch, size=list(image_shape), mode='bilinear')
@@ -85,6 +94,9 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 rows = img_coords[:, 1]
                 cols = img_coords[:, 0]
                 semantics = segmentation[rows, cols]
+                
+                if cfg.SEMANTICS_ZERO_OUT:
+                    semantics *= 0
 
                 # append each pt with its semantics
                 pts = torch.Tensor(pts).cuda()
@@ -130,6 +142,9 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             for key, elems in example_merged.items():
                 if key in ['voxels']:
                     ret[key] = torch.cat(elems, dim=0)
+
+                    if not cfg.TRAIN_SEMANTIC_NETWORK:
+                        ret[key] = ret[key].detach()
                     # import pdb; pdb.set_trace()
                 elif key in ['num_points', 'voxel_centers', 'seg_labels', 'part_labels', 'bbox_reg_labels']:
                     ret[key] = np.concatenate(elems, axis=0)

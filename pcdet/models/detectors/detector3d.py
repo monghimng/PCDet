@@ -31,13 +31,6 @@ class Detector3D(nn.Module):
             '''
             self.seg_model = parse_args_and_construct_model(seg_args)
 
-            if cfg.TRAIN_SEMANTIC_NETWORK:
-                self.seg_model.train()
-            else:
-                self.seg_model.eval()
-                for param in self.seg_model.parameters():
-                    param.requires_grad = False
-
     @property
     def mode(self):
         return 'TRAIN' if self.training else 'TEST'
