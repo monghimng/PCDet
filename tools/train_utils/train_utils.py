@@ -1,4 +1,5 @@
 import torch.nn.functional as F
+from pcdet.utils import calibration
 import torch
 import os
 import glob
@@ -50,6 +51,25 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         # print(seg_model.last_layer[0].weight.grad)
         optimizer.zero_grad()
 
+        if cfg.USE_PSEUDOLIDAR:
+            points_unmerged_torch = []
+            for pts, calib in zip(batch['points_unmerged'], batch['calib']):
+                calib = calibration.Calibration_torch(calib).cuda()
+
+                pts_torch = torch.Tensor(pts).cuda()[:, :3]
+                pts_img_torch, pts_depth_torch = calib.lidar_to_img(pts_torch)
+
+                pts_rect_torch = calib.img_to_rect(pts_img_torch[:, 0], pts_img_torch[:, 1], pts_depth_torch)
+                pts_torch = calib.rect_to_lidar(pts_rect_torch)
+
+                # batch['points_pl_unmerged'].append(pts_torch)
+                points_unmerged_torch.append(pts_torch)
+            batch['points_unmerged'] = points_unmerged_torch
+        elif cfg.TORCH_VOXEL_GENERATOR:
+            for pts in batch['points_unmerged']:
+                pts_torch = torch.Tensor(pts).cuda()
+                batch['points_unmerged'].append(pts_torch)
+
         if cfg.INJECT_SEMANTICS:
             import numpy as np  # todo: for some reason, error is thrown if this line is at the top
             img = batch['img']
@@ -79,6 +99,8 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
             semantic_pts_lst = []
             for pts, segmentation, calib, img_true_size in zip(batch['points_unmerged'], pred_batch, batch['calib'], batch['image_shape']):
 
+                calib = calibration.Calibration_torch(calib).cuda()
+
                 # in kitti, each image could be of different size, we must resize segmentation to the
                 # original size for lifting pseudolidar
                 true_h, true_w = img_true_size
@@ -90,7 +112,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 segmentation = segmentation.reshape([true_h, true_w, -1])
                 pts = pts[:, :3]  # only take xyz
                 img_coords, _ = calib.lidar_to_img(pts)
-                img_coords = img_coords.astype(np.int32)  # note that first col is the cols, second col is the rows
+                img_coords = img_coords.long()  # note that first col is the cols, second col is the rows
                 rows = img_coords[:, 1]
                 cols = img_coords[:, 0]
                 semantics = segmentation[rows, cols]
@@ -99,7 +121,6 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                     semantics *= 0
 
                 # append each pt with its semantics
-                pts = torch.Tensor(pts).cuda()
                 semantic_pts = torch.cat([pts, semantics], dim=1)
                 semantic_pts_lst.append(semantic_pts)
             batch['points_unmerged'] = semantic_pts_lst
@@ -145,7 +166,6 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
 
                     if not cfg.TRAIN_SEMANTIC_NETWORK:
                         ret[key] = ret[key].detach()
-                    # import pdb; pdb.set_trace()
                 elif key in ['num_points', 'voxel_centers', 'seg_labels', 'part_labels', 'bbox_reg_labels']:
                     ret[key] = np.concatenate(elems, axis=0)
                 elif key in ['coordinates', 'points']:
@@ -168,7 +188,6 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 else:
                     ret[key] = np.stack(elems, axis=0)
                 # check if they are the same
-                # import pdb; pdb.set_trace()
                 # batch['voxels'][:, :, :3] == ret['voxels'][:, :, :3]
             batch.update(ret)
 

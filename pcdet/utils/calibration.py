@@ -125,16 +125,28 @@ class Calibration(object):
 
         return boxes, boxes_corner
 
-class Calibration_torch(object):
+import torch.nn as nn
+class Calibration_torch(nn.Module):
+    """
+    extends nn.Module so that we can easily move the calibration matrices to gpu with one call to calib.cuda()
+    """
     def __init__(self, calib_file):
+        super(Calibration_torch, self).__init__()
         if isinstance(calib_file, str):
             calib = get_calib_from_file(calib_file)
-        else:
+        elif isinstance(calib_file, dict):
             calib = calib_file
+        else:
+            # it is a Calibration object
+            calib = {
+                "P2": calib_file.P2,
+                "R0": calib_file.R0,
+                "Tr_velo2cam": calib_file.V2C
+            }
 
-        self.P2 = torch.Tensor(calib['P2'])  # 3 x 4
-        self.R0 = torch.Tensor(calib['R0'])  # 3 x 3
-        self.V2C = torch.Tensor(calib['Tr_velo2cam'])  # 3 x 4
+        self.P2 = nn.Parameter(torch.Tensor(calib['P2']), requires_grad=False)  # 3 x 4
+        self.R0 = nn.Parameter(torch.Tensor(calib['R0']), requires_grad=False)  # 3 x 3
+        self.V2C = nn.Parameter(torch.Tensor(calib['Tr_velo2cam']), requires_grad=False)  # 3 x 4
 
         # Camera intrinsics and extrinsics
         self.cu = self.P2[0, 2]
@@ -149,7 +161,7 @@ class Calibration_torch(object):
         :param pts: (N, 3 or 2)
         :return pts_hom: (N, 4 or 3)
         """
-        pts_hom = torch.cat((pts, torch.ones((pts.shape[0], 1), dtype=torch.float32)), dim=1)
+        pts_hom = torch.cat((pts, torch.ones((pts.shape[0], 1), dtype=torch.float32, device=self.P2.device)), dim=1)
         return pts_hom
 
     def rect_to_lidar(self, pts_rect):
@@ -158,10 +170,10 @@ class Calibration_torch(object):
         :return pts_rect: (N, 3)
         """
         pts_rect_hom = self.cart_to_hom(pts_rect)  # (N, 4)
-        R0_ext = torch.cat((self.R0, torch.zeros((3, 1), dtype=torch.float32)), dim=1)  # (3, 4)
-        R0_ext = torch.cat((R0_ext, torch.zeros((1, 4), dtype=torch.float32)), dim=0)  # (4, 4)
+        R0_ext = torch.cat((self.R0, torch.zeros((3, 1), dtype=torch.float32, device=self.P2.device)), dim=1)  # (3, 4)
+        R0_ext = torch.cat((R0_ext, torch.zeros((1, 4), dtype=torch.float32, device=self.P2.device)), dim=0)  # (4, 4)
         R0_ext[3, 3] = 1
-        V2C_ext = torch.cat((self.V2C, torch.zeros((1, 4), dtype=torch.float32)), dim=0)  # (4, 4)
+        V2C_ext = torch.cat((self.V2C, torch.zeros((1, 4), dtype=torch.float32, device=self.P2.device)), dim=0)  # (4, 4)
         V2C_ext[3, 3] = 1
 
         pts_lidar = torch.matmul(pts_rect_hom, torch.inverse(torch.matmul(R0_ext, V2C_ext).T))
@@ -287,6 +299,9 @@ if __name__ == "__main__":
     print((points_np == points_torch.numpy()).all())
     calib_np = Calibration(calib)
     calib_torch = Calibration_torch(calib)
+    
+    ############################## or test the capability to build Calibration_torch from Calibration of np
+    calib_torch = Calibration_torch(calib_np)
 
     # check going from lidar to (image coordinates + rect depth)
     rect_np_forward = calib_np.lidar_to_rect(points_np)

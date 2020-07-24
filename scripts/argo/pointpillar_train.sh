@@ -38,6 +38,7 @@ INJECT_SEMANTICS_MODE 'logit_car_mask' \
 DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
+USE_PSEUDOLIDAR True \
 #INJECT_SEMANTICS True \
 #INJECT_SEMANTICS_WIDTH 2048 \
 #DATA_CONFIG.FOV_POINTS_ONLY True \
@@ -45,7 +46,6 @@ DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 exit
 fi
 
-NAME=debug_$RANDOM
 NAME=bev_ptswithrgb_normalized_2
 NAME=bev_newvoxelization
 NAME=bev_5pct_0
@@ -53,6 +53,8 @@ NAME=bev_50pct_1
 NAME=bev_10pct_1
 NAME=bev_1pct_1
 NAME=zeroed_out
+NAME=debug_$RANDOM
+NAME=debugging_pl
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=3 \
@@ -62,7 +64,7 @@ train.py \
 --launcher pytorch \
 --sync_bn \
 --batch_size 18 \
---tcp_port 10031 \
+--tcp_port 10033 \
 --set \
 MODE bev \
 VOXELIZE_IN_MODEL_FORWARD True \
@@ -77,6 +79,7 @@ DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 SEMANTICS_ZERO_OUT True \
+USE_PSEUDOLIDAR True \
 #--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \
 #--pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
 #--epochs 200 \
