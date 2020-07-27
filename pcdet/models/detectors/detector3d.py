@@ -30,6 +30,7 @@ class Detector3D(nn.Module):
             MODEL.PRETRAINED /home/eecs/monghim.ng/BESEG/hrnet/hrnet_w48_cityscapes_cls19_1024x2048_trainset.pth \
             '''
             self.seg_model = parse_args_and_construct_model(seg_args)
+            self.seg_model.ck = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
 
     @property
     def mode(self):

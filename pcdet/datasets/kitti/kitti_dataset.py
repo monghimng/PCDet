@@ -708,6 +708,7 @@ class KittiDataset(BaseKittiDataset):
             fov_flag = self.get_fov_flag(pts_rect, img_shape, calib)
             points = points[fov_flag]
 
+        print(sample_idx)
         input_dict = {
             'points': points,
             'sample_idx': sample_idx,

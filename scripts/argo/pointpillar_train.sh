@@ -13,18 +13,18 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
-#DEBUG=true
-DEBUG=false
+DEBUG=true
+#DEBUG=false
 
 if [ "$DEBUG" = true ] ; then
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
 python \
 train.py \
 --cfg_file cfgs/argo/pointpillar_forward50x50.yaml \
---batch_size 2 \
+--batch_size 7 \
+--workers 0 \
 --extra_tag debug_$RANDOM \
 --pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
---workers 0 \
 --set \
 MODE bev \
 VOXELIZE_IN_MODEL_FORWARD True \
@@ -39,9 +39,12 @@ DATA_CONFIG.AUGMENTATION.NOISE_PER_OBJECT.ENABLED False \
 DATA_CONFIG.AUGMENTATION.NOISE_GLOBAL_SCENE.ENABLED False \
 DATA_CONFIG.AUGMENTATION.DB_SAMPLER.ENABLED False \
 USE_PSEUDOLIDAR True \
+DATA_CONFIG.TRAIN.SHUFFLE_POINTS False \
 #INJECT_SEMANTICS True \
 #INJECT_SEMANTICS_WIDTH 2048 \
 #DATA_CONFIG.FOV_POINTS_ONLY True \
+#--batch_size 2 \
+#--workers 0 \
 
 exit
 fi

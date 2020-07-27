@@ -30,6 +30,15 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         for param in seg_model.parameters():
             param.requires_grad = False
 
+    device = torch.cuda.current_device()
+
+    # todo: remvoe this after debuggin
+    ck = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
+    b = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
+    c = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
+    d = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
+
+    import pdb;pdb.set_trace()
     for cur_it in range(total_it_each_epoch):
         try:
             batch = next(dataloader_iter)
@@ -53,14 +62,51 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
 
         if cfg.USE_PSEUDOLIDAR:
             points_unmerged_torch = []
-            for pts, calib in zip(batch['points_unmerged'], batch['calib']):
+            for pts, calib, shape in zip(batch['points_unmerged'], batch['calib'], batch['image_shape']):
+                print('before cuad')
                 calib = calibration.Calibration_torch(calib).cuda()
+                print('after cuad')
 
+                # todo: this code is only needed for lidar points, can be removed when using pl
                 pts_torch = torch.Tensor(pts).cuda()[:, :3]
                 pts_img_torch, pts_depth_torch = calib.lidar_to_img(pts_torch)
 
-                pts_rect_torch = calib.img_to_rect(pts_img_torch[:, 0], pts_img_torch[:, 1], pts_depth_torch)
+                ### addition code
+                depth_map = torch.zeros(tuple(shape), device=device)
+                cols = pts_img_torch[:, 0]
+                rows = pts_img_torch[:, 1]
+                cols = cols.long()
+                rows = rows.long()
+
+                # constructed depth map
+                depth_map[rows, cols] = pts_depth_torch
+                # top_margin, left_margin = 480, 0  # todo: need to figure out size
+                # depth_map_height, depth_map_width = 960, 600
+                top_margin, left_margin = 0, 0  # todo: need to figure out size
+                depth_map_height, depth_map_width = shape
+
+                # crop
+                depth_map *= ck
+                depth_map = depth_map[top_margin: top_margin + depth_map_height, left_margin: left_margin + depth_map_width]
+                valid = depth_map != 0
+                valid = valid.flatten()
+
+                import numpy as np
+                row_linspace = torch.arange(top_margin, top_margin + depth_map_height)
+                col_linspace = torch.arange(left_margin, left_margin + depth_map_width)
+                rows, cols = torch.meshgrid(row_linspace, col_linspace)
+
+                # todo: not needed for pl
+                cols = cols.flatten()[valid].cuda()
+                rows = rows.flatten()[valid].cuda()
+                pts_depth_torch = depth_map.flatten()[valid]
+                # todo: end not needed for pl
+
+                pts_rect_torch = calib.img_to_rect(cols, rows, pts_depth_torch)
                 pts_torch = calib.rect_to_lidar(pts_rect_torch)
+
+                # todo: this code should not be needed when using the actual pl
+
 
                 # batch['points_pl_unmerged'].append(pts_torch)
                 points_unmerged_torch.append(pts_torch)
@@ -115,12 +161,17 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 img_coords = img_coords.long()  # note that first col is the cols, second col is the rows
                 rows = img_coords[:, 1]
                 cols = img_coords[:, 0]
+                try:
+                    assert (rows >= 0).all() and (rows < len(segmentation)).all() and (cols >= 0).all() and (cols <= len(segmentation[0])).all()
+                except:
+                    import pdb;pdb.set_trace()
                 semantics = segmentation[rows, cols]
                 
                 if cfg.SEMANTICS_ZERO_OUT:
                     semantics *= 0
 
                 # append each pt with its semantics
+                pts += c
                 semantic_pts = torch.cat([pts, semantics], dim=1)
                 semantic_pts_lst.append(semantic_pts)
             batch['points_unmerged'] = semantic_pts_lst
@@ -145,6 +196,8 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 if cfg.TORCH_VOXEL_GENERATOR:
                     indices = voxel_grid['voxel_pt_indices_into_original_pt_cloud']
                     voxels = points_torch[indices]
+                    # todo
+                    voxels += b / 1000 + seg_model.ck / 1000
                     # -1 in the indices means unmapped pt, thus we zero those out afterward
                     voxels[indices == -1] = 0
                 else:
@@ -194,6 +247,7 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         loss, tb_dict, disp_dict = model_func(model, batch)
 
         loss.backward()
+        import pdb; pdb.set_trace()
         clip_grad_norm_(model.parameters(), optim_cfg.GRAD_NORM_CLIP)
         optimizer.step()
 
