@@ -60,7 +60,6 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         optimizer.zero_grad()
 
         ############################## Begin code for torch voxelization ##############################
-        cfg.TORCH_VOXEL_GENERATOR = cfg.USE_PSEUDOLIDAR or cfg.INJECT_SEMANTICS
         if cfg.TORCH_VOXEL_GENERATOR:
 
             ############################## Get either lidar or pseudolidar from depth map ##############################

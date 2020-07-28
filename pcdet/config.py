@@ -55,7 +55,12 @@ def cfg_from_yaml_file(cfg_file, config):
             new_config = yaml.load(f)
         config.update(EasyDict(new_config))
 
+    cfg_preprocess(cfg)
     return config
+
+
+def cfg_preprocess(cfg):
+    cfg.TORCH_VOXEL_GENERATOR = cfg.USE_PSEUDOLIDAR or cfg.INJECT_SEMANTICS
 
 
 cfg = EasyDict()
@@ -74,7 +79,8 @@ cfg.INJECT_SEMANTICS_HEIGHT = 0
 cfg.INJECT_SEMANTICS_WIDTH = 0
 cfg.INJECT_SEMANTICS_MODE = 'binary_car_mask'  # one of binary_car_mask, logit_car_mask
 
-cfg.TORCH_VOXEL_GENERATOR = False
 cfg.TRAIN_SEMANTIC_NETWORK = False
 cfg.SEMANTICS_ZERO_OUT = False
 cfg.USE_PSEUDOLIDAR = False
+
+# cfg.TORCH_VOXEL_GENERATOR  # set by a combination of other scripts
