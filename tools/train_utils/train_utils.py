@@ -18,17 +18,17 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
     if rank == 0:
         pbar = tqdm.tqdm(total=total_it_each_epoch, leave=leave_pbar, desc='train', dynamic_ncols=True)
 
+    model.train()
     if cfg.INJECT_SEMANTICS:
         try:
             seg_model = model.module.seg_model
         except:
             seg_model = model.seg_model
         
-    model.train()
-    if not cfg.TRAIN_SEMANTIC_NETWORK:
-        seg_model.eval()
-        for param in seg_model.parameters():
-            param.requires_grad = False
+        if not cfg.TRAIN_SEMANTIC_NETWORK:
+            seg_model.eval()
+            for param in seg_model.parameters():
+                param.requires_grad = False
 
     device = torch.cuda.current_device()
 
@@ -38,7 +38,6 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
     c = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
     d = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
 
-    import pdb;pdb.set_trace()
     for cur_it in range(total_it_each_epoch):
         try:
             batch = next(dataloader_iter)
@@ -60,124 +59,131 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         # print(seg_model.last_layer[0].weight.grad)
         optimizer.zero_grad()
 
-        if cfg.USE_PSEUDOLIDAR:
+        ############################## Begin code for torch voxelization ##############################
+        cfg.TORCH_VOXEL_GENERATOR = cfg.USE_PSEUDOLIDAR or cfg.INJECT_SEMANTICS
+        if cfg.TORCH_VOXEL_GENERATOR:
+
+            ############################## Get either lidar or pseudolidar from depth map ##############################
             points_unmerged_torch = []
-            for pts, calib, shape in zip(batch['points_unmerged'], batch['calib'], batch['image_shape']):
-                print('before cuad')
-                calib = calibration.Calibration_torch(calib).cuda()
-                print('after cuad')
+            if cfg.USE_PSEUDOLIDAR:
+                for pts, calib, shape in zip(batch['points_unmerged'], batch['calib'], batch['image_shape']):
+                    print('before cuad')
+                    calib = calibration.Calibration_torch(calib).cuda()
+                    print('after cuad')
 
-                # todo: this code is only needed for lidar points, can be removed when using pl
-                pts_torch = torch.Tensor(pts).cuda()[:, :3]
-                pts_img_torch, pts_depth_torch = calib.lidar_to_img(pts_torch)
+                    # todo: this code is only needed for debugging lidar points, can be removed when using pl
+                    pts_torch = torch.Tensor(pts).cuda()[:, :3]
+                    pts_img_torch, pts_depth_torch = calib.lidar_to_img(pts_torch)
 
-                ### addition code
-                depth_map = torch.zeros(tuple(shape), device=device)
-                cols = pts_img_torch[:, 0]
-                rows = pts_img_torch[:, 1]
-                cols = cols.long()
-                rows = rows.long()
+                    ### addition code
+                    depth_map = torch.zeros(tuple(shape), device=device)
+                    cols = pts_img_torch[:, 0]
+                    rows = pts_img_torch[:, 1]
+                    cols = cols.long()
+                    rows = rows.long()
 
-                # constructed depth map
-                depth_map[rows, cols] = pts_depth_torch
-                # top_margin, left_margin = 480, 0  # todo: need to figure out size
-                # depth_map_height, depth_map_width = 960, 600
-                top_margin, left_margin = 0, 0  # todo: need to figure out size
-                depth_map_height, depth_map_width = shape
+                    # constructed depth map
+                    depth_map[rows, cols] = pts_depth_torch
+                    # top_margin, left_margin = 480, 0  # todo: need to figure out size
+                    # depth_map_height, depth_map_width = 960, 600
+                    top_margin, left_margin = 0, 0  # todo: need to figure out size
+                    depth_map_height, depth_map_width = shape
 
-                # crop
-                depth_map *= ck
-                depth_map = depth_map[top_margin: top_margin + depth_map_height, left_margin: left_margin + depth_map_width]
-                valid = depth_map != 0
-                valid = valid.flatten()
+                    # crop
+                    depth_map *= ck
+                    depth_map = depth_map[top_margin: top_margin + depth_map_height, left_margin: left_margin + depth_map_width]
+                    # todo: end this code is only needed for debugging lidar points, can be removed when using pl
+                    valid = depth_map != 0
+                    valid = valid.flatten()
 
-                import numpy as np
-                row_linspace = torch.arange(top_margin, top_margin + depth_map_height)
-                col_linspace = torch.arange(left_margin, left_margin + depth_map_width)
-                rows, cols = torch.meshgrid(row_linspace, col_linspace)
+                    import numpy as np
+                    row_linspace = torch.arange(top_margin, top_margin + depth_map_height)
+                    col_linspace = torch.arange(left_margin, left_margin + depth_map_width)
+                    rows, cols = torch.meshgrid(row_linspace, col_linspace)
 
-                # todo: not needed for pl
-                cols = cols.flatten()[valid].cuda()
-                rows = rows.flatten()[valid].cuda()
-                pts_depth_torch = depth_map.flatten()[valid]
-                # todo: end not needed for pl
+                    # todo: not needed for pl
+                    cols = cols.flatten()[valid].cuda()
+                    rows = rows.flatten()[valid].cuda()
+                    pts_depth_torch = depth_map.flatten()[valid]
+                    # todo: end not needed for pl
 
-                pts_rect_torch = calib.img_to_rect(cols, rows, pts_depth_torch)
-                pts_torch = calib.rect_to_lidar(pts_rect_torch)
+                    pts_rect_torch = calib.img_to_rect(cols, rows, pts_depth_torch)
+                    pts_torch = calib.rect_to_lidar(pts_rect_torch)
 
-                # todo: this code should not be needed when using the actual pl
+                    # todo: this code should not be needed when using the actual pl
 
 
-                # batch['points_pl_unmerged'].append(pts_torch)
-                points_unmerged_torch.append(pts_torch)
+                    # batch['points_pl_unmerged'].append(pts_torch)
+                    points_unmerged_torch.append(pts_torch)
+            else:
+                # otherwise load lidar points
+                for pts in batch['points_unmerged']:
+                    pts_torch = torch.Tensor(pts).cuda()
+                    points_unmerged_torch.append(pts_torch)
             batch['points_unmerged'] = points_unmerged_torch
-        elif cfg.TORCH_VOXEL_GENERATOR:
-            for pts in batch['points_unmerged']:
-                pts_torch = torch.Tensor(pts).cuda()
-                batch['points_unmerged'].append(pts_torch)
 
-        if cfg.INJECT_SEMANTICS:
-            import numpy as np  # todo: for some reason, error is thrown if this line is at the top
-            img = batch['img']
-            image_shape = img.shape[2:]
-            device = torch.cuda.current_device()
-            img = torch.tensor(img, dtype=torch.float32, device=device)
+            ############################## Semantic fusion ##############################
+            if cfg.INJECT_SEMANTICS:
+                import numpy as np  # todo: for some reason, error is thrown if this line is at the top
+                img = batch['img']
+                image_shape = img.shape[2:]
+                device = torch.cuda.current_device()
+                img = torch.tensor(img, dtype=torch.float32, device=device)
 
-            pred_batch = seg_model(img)
+                pred_batch = seg_model(img)
 
-            # todo: try nearest neighbor when we pass features down because those might be more accuracte probabilities
-            pred_batch = F.upsample(input=pred_batch, size=list(image_shape), mode='bilinear')
+                # todo: try nearest neighbor when we pass features down because those might be more accuracte probabilities
+                pred_batch = F.upsample(input=pred_batch, size=list(image_shape), mode='bilinear')
 
-            if cfg.INJECT_SEMANTICS_MODE == 'binary_car_mask':
-                # argmax strategy
-                pred_batch = pred_batch.argmax(dim=1, keepdim=True)
-                pred_batch = pred_batch == 13  # convert to binary mask for cars for now
-                pred_batch = pred_batch.int()
-            elif cfg.INJECT_SEMANTICS_MODE == 'logit_car_mask':
-                pred_batch = pred_batch[:, 13: 14, :, :]
+                if cfg.INJECT_SEMANTICS_MODE == 'binary_car_mask':
+                    # argmax strategy
+                    pred_batch = pred_batch.argmax(dim=1, keepdim=True)
+                    pred_batch = pred_batch == 13  # convert to binary mask for cars for now
+                    pred_batch = pred_batch.int()
+                elif cfg.INJECT_SEMANTICS_MODE == 'logit_car_mask':
+                    pred_batch = pred_batch[:, 13: 14, :, :]
 
-            # probability distribution strategy
-            # logits strategy
-            # cfg.DATA_CONFIG.NUM_POINT_FEATURES['total'] = 3 + 19
-            # cfg.DATA_CONFIG.NUM_POINT_FEATURES['use'] = 3 + 19
+                # probability distribution strategy
+                # logits strategy
+                # cfg.DATA_CONFIG.NUM_POINT_FEATURES['total'] = 3 + 19
+                # cfg.DATA_CONFIG.NUM_POINT_FEATURES['use'] = 3 + 19
 
-            # project pts onto image to get the point color
-            semantic_pts_lst = []
-            for pts, segmentation, calib, img_true_size in zip(batch['points_unmerged'], pred_batch, batch['calib'], batch['image_shape']):
+                # project pts onto image to get the point color
+                semantic_pts_lst = []
+                for pts, segmentation, calib, img_true_size in zip(batch['points_unmerged'], pred_batch, batch['calib'], batch['image_shape']):
 
-                calib = calibration.Calibration_torch(calib).cuda()
+                    calib = calibration.Calibration_torch(calib).cuda()
 
-                # in kitti, each image could be of different size, we must resize segmentation to the
-                # original size for lifting pseudolidar
-                true_h, true_w = img_true_size
+                    # in kitti, each image could be of different size, we must resize segmentation to the
+                    # original size for lifting pseudolidar
+                    true_h, true_w = img_true_size
 
-                # segmentation = cv2.resize(segmentation, (true_w, true_h),
-                #                  interpolation=cv2.INTER_NEAREST)
-                segmentation = torch.unsqueeze(segmentation, dim=0)
-                segmentation = F.interpolate(segmentation, size=(true_h, true_w))
-                segmentation = segmentation.reshape([true_h, true_w, -1])
-                pts = pts[:, :3]  # only take xyz
-                img_coords, _ = calib.lidar_to_img(pts)
-                img_coords = img_coords.long()  # note that first col is the cols, second col is the rows
-                rows = img_coords[:, 1]
-                cols = img_coords[:, 0]
-                try:
-                    assert (rows >= 0).all() and (rows < len(segmentation)).all() and (cols >= 0).all() and (cols <= len(segmentation[0])).all()
-                except:
-                    import pdb;pdb.set_trace()
-                semantics = segmentation[rows, cols]
-                
-                if cfg.SEMANTICS_ZERO_OUT:
-                    semantics *= 0
+                    # segmentation = cv2.resize(segmentation, (true_w, true_h),
+                    #                  interpolation=cv2.INTER_NEAREST)
+                    segmentation = torch.unsqueeze(segmentation, dim=0)
+                    segmentation = F.interpolate(segmentation, size=(true_h, true_w))
+                    segmentation = segmentation.reshape([true_h, true_w, -1])
+                    pts = pts[:, :3]  # only take xyz
+                    img_coords, _ = calib.lidar_to_img(pts)
+                    img_coords = img_coords.long()  # note that first col is the cols, second col is the rows
+                    rows = img_coords[:, 1]
+                    cols = img_coords[:, 0]
+                    try:
+                        assert (rows >= 0).all() and (rows < len(segmentation)).all() and (cols >= 0).all() and (cols <= len(segmentation[0])).all()
+                    except:
+                        import pdb;pdb.set_trace()
+                    semantics = segmentation[rows, cols]
 
-                # append each pt with its semantics
-                pts += c
-                semantic_pts = torch.cat([pts, semantics], dim=1)
-                semantic_pts_lst.append(semantic_pts)
-            batch['points_unmerged'] = semantic_pts_lst
+                    if cfg.SEMANTICS_ZERO_OUT:
+                        semantics *= 0
 
-        if cfg.VOXELIZE_IN_MODEL_FORWARD:
+                    # append each pt with its semantics
+                    pts += c
+                    semantic_pts = torch.cat([pts, semantics], dim=1)
+                    semantic_pts_lst.append(semantic_pts)
+                batch['points_unmerged'] = semantic_pts_lst
 
+            ############################## Voxelize and collate ##############################
             points_batch_torch = batch['points_unmerged']
             voxel_generator = train_loader.dataset.voxel_generator
 
@@ -193,15 +199,12 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
                 # and therefore indifferentiable, we get only the indices that map a pt to its proper voxel.
                 # This allows gradient to flow through voxelization.
 
-                if cfg.TORCH_VOXEL_GENERATOR:
-                    indices = voxel_grid['voxel_pt_indices_into_original_pt_cloud']
-                    voxels = points_torch[indices]
-                    # todo
-                    voxels += b / 1000 + seg_model.ck / 1000
-                    # -1 in the indices means unmapped pt, thus we zero those out afterward
-                    voxels[indices == -1] = 0
-                else:
-                    voxels = voxel_grid["voxels"]
+                indices = voxel_grid['voxel_pt_indices_into_original_pt_cloud']
+                voxels = points_torch[indices]
+                # todo: only used to debug whehter gradients are flown back to image networks
+                # voxels += b / 1000 + seg_model.ck / 1000
+                # -1 in the indices means unmapped pt, thus we zero those out afterward
+                voxels[indices == -1] = 0
 
                 voxel_centers = (coordinates[:, ::-1] + 0.5) * voxel_generator.voxel_size \
                                 + voxel_generator.point_cloud_range[0:3]
@@ -247,7 +250,6 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         loss, tb_dict, disp_dict = model_func(model, batch)
 
         loss.backward()
-        import pdb; pdb.set_trace()
         clip_grad_norm_(model.parameters(), optim_cfg.GRAD_NORM_CLIP)
         optimizer.step()
 

@@ -64,7 +64,6 @@ cfg.LOCAL_RANK = 0
 
 # default flags
 cfg.TAG_PTS_WITH_RGB = False
-cfg.VOXELIZE_IN_MODEL_FORWARD = False
 cfg.MODE = '3dobjdet'
 cfg.ALTERNATE_PT_CLOUD_ABS_DIR = ''  # default to empty str which represents False
 cfg.PERCENT_OF_PTS = 100  # by default, use all of the points
