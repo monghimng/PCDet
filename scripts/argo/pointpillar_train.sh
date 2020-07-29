@@ -28,10 +28,10 @@ train.py \
 --set \
 MODE bev \
 USE_PSEUDOLIDAR True \
-#INJECT_SEMANTICS True \
-#INJECT_SEMANTICS_WIDTH 1240 \
-#INJECT_SEMANTICS_MODE 'logit_car_mask' \
-#TRAIN_SEMANTIC_NETWORK True \
+INJECT_SEMANTICS True \
+INJECT_SEMANTICS_WIDTH 1240 \
+INJECT_SEMANTICS_MODE 'logit_car_mask' \
+TRAIN_SEMANTIC_NETWORK True \
 #DATA_CONFIG.TRAIN.SHUFFLE_POINTS False \
 #DATA_CONFIG.FOV_POINTS_ONLY True \
 #--batch_size 2 \
@@ -49,7 +49,7 @@ NAME=bev_10pct_1
 NAME=bev_1pct_1
 NAME=zeroed_out
 NAME=debug_$RANDOM
-NAME=debugging_lidar
+NAME=debugging_lidar_1
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=3 \
