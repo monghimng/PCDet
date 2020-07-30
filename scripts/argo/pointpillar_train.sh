@@ -24,14 +24,15 @@ train.py \
 --batch_size 2 \
 --workers 0 \
 --extra_tag debug_$RANDOM \
---pretrained_model /home/eecs/monghim.ng/BEVSEG/PCDet2/pointpillar.pth \
+--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_forward50x50/debugging_lidar_2/ckpt/checkpoint_epoch_6.pth \
 --set \
+DATA_CONFIG.TRAIN.SHUFFLE_POINTS False \
 MODE bev \
-USE_PSEUDOLIDAR True \
-INJECT_SEMANTICS True \
-INJECT_SEMANTICS_WIDTH 1240 \
-INJECT_SEMANTICS_MODE 'logit_car_mask' \
-TRAIN_SEMANTIC_NETWORK True \
+#USE_PSEUDOLIDAR True \
+#INJECT_SEMANTICS True \
+#INJECT_SEMANTICS_WIDTH 1240 \
+#INJECT_SEMANTICS_MODE 'logit_car_mask' \
+#TRAIN_SEMANTIC_NETWORK True \
 #DATA_CONFIG.TRAIN.SHUFFLE_POINTS False \
 #DATA_CONFIG.FOV_POINTS_ONLY True \
 #--batch_size 2 \
@@ -49,7 +50,7 @@ NAME=bev_10pct_1
 NAME=bev_1pct_1
 NAME=zeroed_out
 NAME=debug_$RANDOM
-NAME=debugging_lidar_1
+NAME=debugging_lidar_2
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=3 \

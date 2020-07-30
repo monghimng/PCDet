@@ -6,6 +6,7 @@ import torch
 import time
 import pickle
 from pcdet.config import cfg
+import wandb
 
 def training_before_epoch(model):
     seg_model = None
@@ -229,22 +230,94 @@ def between_dataloading_and_feedforward(batch, model, loader):
         batch.update(ret)
 
 
-from ...utils.metrics import Evaluator
+from pcdet.utils.metrics import Evaluator
 import numpy as np
 
 num_classes = 2  # todo
 # construct an evaluator to accumulate iou
-evaluator = Evaluator(
+testing_evaluator = Evaluator(
     1 + num_classes)  # plus one for the void region not occupied by anything and also nondrivable
-def testing_after_every_iter(gt, predictions):
+def after_stage1_rpn_net(detect3d, rpn_ret_dict, input_dict):
+    """
+    if training:
+        return the bev_loss, tb_dict
+    else:
+        compute ious
+    """
+    self = detect3d
+    tb_dict = {}
+
+    ############################## compute loss #############################
+    num_classes = 2
+
+    # obtain bev features in the right output dimension
+
+    # opt1: using poitnpillar features
+    rpn_features = rpn_ret_dict['spatial_features_last']
+    # opt2: using projected points # todo this is cheating :D
+    # rpn_features = rpn_ret_dict['ck']
+    rpn_features = F.interpolate(rpn_features, size=416, mode='bilinear')
+    # rpn_features = torch.cat([rpn_features, rpn_features, rpn_features], dim=1)  # duplicate 3 times to fit usual rgb images
+
+    bev_features = self.bev_conv(rpn_features)
+    bev_features = F.interpolate(bev_features, size=200, mode='bilinear')
+
+    gt = input_dict['bev'].astype(np.int32)
+    # gt = input_dict['bev'].astype(np.int32)[:, 1: 2]
+
+    gt = np.transpose(gt, [0, 1, 3, 2])
+    gt = gt[:, :, ::-1, ::-1]
+    gt = np.ascontiguousarray(gt)
+
+    # torch loss only takes in tensor :(
+    gt_tensor = torch.tensor(gt, dtype=torch.float32, device=torch.cuda.current_device())
+
+    # reshape both bev_features and gt to [N * H * W, num_classes] because bceloss treats
+    # the second dimension as different classes and compute them separately
+    # since the doc was written for linear layers, not sure what happened if H and W
+    # dimensions are also provided. Doing this just in case.
+    bev_features_reshaped = bev_features.permute(0, 2, 3, 1).reshape([-1, num_classes])
+    gt_tensor_reshaped = gt_tensor.permute(0, 2, 3, 1).reshape([-1, num_classes])
+
+    # # compute positive weights for each classes to focus more on positive classes for bcelogit loss
+    # # only need to do this once to obtain those weights
+    # # uncomment this to get the stats
+    # global pos_samples
+    # global neg_samples
+    # pos_samples += gt_tensor_reshaped.sum(dim=0)
+    # neg_samples += len(gt_tensor_reshaped) - gt_tensor_reshaped.sum(dim=0)
+    # print("pos_weights:{} total_pos_samples: {} total_neg_samples: {}".format(neg_samples / pos_samples,
+    #       pos_samples, neg_samples))
+
+    bev_loss = self.bev_loss(bev_features_reshaped, gt_tensor_reshaped)
+    # bev_loss = self.bev_loss(bev_features, gt_tensor)
+
+    tb_dict['bev_loss'] = bev_loss.item()
+
+    ############################## somtimes log bev to wandb ##############################
+
+    # make predictions based on the logits
+    logits = bev_features.detach().cpu().numpy()
+    predictions = logits > 0
+    predictions = predictions.astype(np.int32)
+
+    if self.training:
+        for cls_idx in range(num_classes):
+            # pick the 0th image in this sample and log by different cls
+            tb_dict['image_bev_predicted_cls{}'.format(cls_idx + 1)] = predictions[0, cls_idx]
+            tb_dict['image_bev_projected_pts_cls{}'.format(cls_idx + 1)] = rpn_features[0, cls_idx]
+            tb_dict['image_bev_gt_cls{}'.format(cls_idx + 1)] = gt[0, cls_idx]
 
     ############################## compute iou metrics ##############################
+
+    # construct an evaluator FOR THIS ITER ONLY to compute iou for this batch to give intuition in training
+    evaluator = Evaluator(
+        1 + num_classes)  # plus one for the void region not occupied by anything and also nondrivable
 
     # make copies because we don't want fns that depend on gt & predictions to change
     gt = np.array(gt)
     predictions = np.array(predictions)
 
-    # gt and preds are supposed to contain binary 0 or 1 representing whether that class is present
     # multiply by the channel num to differentiate between classes
     for cls_idx in range(num_classes):
         gt[:, cls_idx, :, :] *= cls_idx + 1  # plus 1 because want to leave 0 to represent void
@@ -252,14 +325,35 @@ def testing_after_every_iter(gt, predictions):
 
     evaluator.add_batch(gt, predictions)
     ciou = evaluator.class_iou()
-    tb_dict = dict()
     for cls_idx in range(num_classes):
         tb_dict['iou_cls{}'.format(cls_idx + 1)] = ciou[cls_idx + 1]
     miou = ciou[1:].mean()  # compute miou without the void class
     tb_dict['miou'] = miou
-    
-    return tb_dict
+
+    if self.training:
+        return bev_loss, tb_dict
+    else:
+        # if this run is using wandb, also log to it
+        if hasattr(wandb, 'has_initialized'):
+            wandb.log(tb_dict)
+        else:
+            print(tb_dict)
+
+        testing_evaluator.add_batch(gt, predictions)
 
 
 def testing_after_all_iter():
-    pass
+    ciou = testing_evaluator.class_iou()
+    tb_dict = dict()
+    for cls_idx in range(num_classes):
+        tb_dict['eval_iou_cls{}'.format(cls_idx + 1)] = ciou[cls_idx + 1]
+    miou = ciou[1:].mean()  # compute miou without the void class
+    tb_dict['eval_miou'] = miou
+
+    # print to stdout
+    print('############################## Final BEV results ##############################')
+    print(tb_dict)
+
+    # if this run is using wandb, also log to it
+    if hasattr(wandb, 'has_initialized'):
+        wandb.log(tb_dict)

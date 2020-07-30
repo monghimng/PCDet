@@ -59,6 +59,7 @@ def eval_one_epoch(model, dataloader, epoch_id, logger, save_to_file=False, resu
         det_annos += annos
         progress_bar.set_postfix(disp_dict)
         progress_bar.update()
+    exp.testing_after_all_iter()
 
     progress_bar.close()
 

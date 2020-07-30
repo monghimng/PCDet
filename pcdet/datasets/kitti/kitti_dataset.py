@@ -691,7 +691,10 @@ class KittiDataset(BaseKittiDataset):
         return len(self.kitti_infos)
 
     def __getitem__(self, index):
-        # index = 4
+
+        # # for debug purpose, uncomment this to fix the frame
+        # index = 5
+
         info = copy.deepcopy(self.kitti_infos[index])
 
         sample_idx = info['point_cloud']['lidar_idx']

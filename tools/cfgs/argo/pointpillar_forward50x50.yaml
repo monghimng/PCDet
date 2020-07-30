@@ -15,7 +15,7 @@ DATA_CONFIG:
         INFO_PATH: [
             data/argo/kitti_infos_train.pkl
         ]
-        SHUFFLE_POINTS: True
+        SHUFFLE_POINTS: True  # DATA_CONFIG.TRAIN.SHUFFLE_POINTS
         MAX_NUMBER_OF_VOXELS: 16000
 
     TEST:
