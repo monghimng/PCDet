@@ -10,7 +10,7 @@
 source ~/.bashrc &> /dev/null
 cd $CODE/BEVSEG/PCDet2/tools
 
-NAME=debugging_lidar
+NAME=debugging_lidar_2
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-4}
 python \
@@ -18,12 +18,12 @@ test.py \
 --cfg_file cfgs/argo/pointpillar_forward50x50.yaml \
 --batch_size 13 \
 --extra_tag $NAME \
---ckpt /data/ck/BEVSEG/PCDet2/output/pointpillar_forward50x50/debugging_lidar/ckpt/checkpoint_epoch_80.pth \
+--eval_all \
 --set \
 MODE bev \
+#--ckpt /data/ck/BEVSEG/PCDet2/output/pointpillar_forward50x50/debugging_lidar_2/ckpt/checkpoint_epoch_80.pth \
 #--batch_size 2 \
 #--workers 0 \
-#--eval_all \
 #INJECT_SEMANTICS True \
 #INJECT_SEMANTICS_WIDTH 1240 \
 #INJECT_SEMANTICS_MODE 'logit_car_mask' \

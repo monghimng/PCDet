@@ -13,8 +13,8 @@ cd $CODE/BEVSEG/PCDet2/tools
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
-DEBUG=true
-#DEBUG=false
+#DEBUG=true
+DEBUG=false
 
 if [ "$DEBUG" = true ] ; then
 # for debugging, with only 1 gpu, no distributed training, no dataloading thread
@@ -28,11 +28,11 @@ train.py \
 --set \
 DATA_CONFIG.TRAIN.SHUFFLE_POINTS False \
 MODE bev \
-#USE_PSEUDOLIDAR True \
-#INJECT_SEMANTICS True \
-#INJECT_SEMANTICS_WIDTH 1240 \
-#INJECT_SEMANTICS_MODE 'logit_car_mask' \
+INJECT_SEMANTICS True \
+INJECT_SEMANTICS_WIDTH 1240 \
+INJECT_SEMANTICS_MODE 'logit_car_mask' \
 #TRAIN_SEMANTIC_NETWORK True \
+#USE_PSEUDOLIDAR True \
 #DATA_CONFIG.TRAIN.SHUFFLE_POINTS False \
 #DATA_CONFIG.FOV_POINTS_ONLY True \
 #--batch_size 2 \
@@ -51,6 +51,7 @@ NAME=bev_1pct_1
 NAME=zeroed_out
 NAME=debug_$RANDOM
 NAME=debugging_lidar_2
+NAME=bev_semantics_lidar_0
 
 #python \
 python -m torch.distributed.launch --nproc_per_node=3 \
@@ -63,9 +64,9 @@ train.py \
 --tcp_port 10033 \
 --set \
 MODE bev \
-#INJECT_SEMANTICS True \
-#INJECT_SEMANTICS_WIDTH 1240 \
-#INJECT_SEMANTICS_MODE 'logit_car_mask' \
+INJECT_SEMANTICS True \
+INJECT_SEMANTICS_WIDTH 1240 \
+INJECT_SEMANTICS_MODE 'logit_car_mask' \
 #TRAIN_SEMANTIC_NETWORK True \
 #USE_PSEUDOLIDAR True \
 #--pretrained_model /data/ck/BEVSEG/PCDet2/output/pointpillar_centered50x50/noposweight/ckpt/checkpoint_epoch_44.pth \

@@ -25,7 +25,7 @@ class PointPillar(Detector3D):
 
         # bev conv
         in_channels_bev = 384
-        out_channels_bev = 2 #todo
+        out_channels_bev = 2  # todo
         # this was calculated by counting number of positive pixels for each cls
         # pos_weights = torch.Tensor([1.7736, 28.0409]).cuda() / 2# todo
         pos_weights = torch.Tensor([28.0409]).cuda()

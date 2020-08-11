@@ -89,7 +89,7 @@ def repeat_eval_ckpt(model, test_loader, args, eval_output_dir, logger, ckpt_dir
     tb_log = SummaryWriter(log_dir=str(eval_output_dir / ('tensorboard_%s' % cfg.MODEL.TEST.SPLIT)))
     if args.local_rank == 0:
         wandb.init(project='BEVSEG-PCDet', sync_tensorboard=True, name=args.extra_tag + "_eval", config={**vars(args), **cfg})
-        wandb.exp_has_initialized = True
+        cfg.wandb_has_initialized = True
 
     total_time = 0
     first_eval = True

@@ -334,7 +334,7 @@ def after_stage1_rpn_net(detect3d, rpn_ret_dict, input_dict):
         return bev_loss, tb_dict
     else:
         # if this run is using wandb, also log to it
-        if hasattr(wandb, 'has_initialized'):
+        if cfg.wandb_has_initialized:
             wandb.log(tb_dict)
         else:
             print(tb_dict)
@@ -355,5 +355,5 @@ def testing_after_all_iter():
     print(tb_dict)
 
     # if this run is using wandb, also log to it
-    if hasattr(wandb, 'has_initialized'):
+    if cfg.wandb_has_initialized:
         wandb.log(tb_dict)
