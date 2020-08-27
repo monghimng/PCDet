@@ -29,7 +29,6 @@ def training_before_epoch(model):
     
     return seg_model
 
-
 def between_dataloading_and_feedforward(batch, model, loader):
 
     device = torch.cuda.current_device()
@@ -37,50 +36,83 @@ def between_dataloading_and_feedforward(batch, model, loader):
     ############################## Begin code for torch voxelization ##############################
     if cfg.TORCH_VOXEL_GENERATOR:
 
+        if cfg.USE_PSEUDOLIDAR or cfg.INJECT_SEMANTICS:
+            img = batch['img']
+            image_shape = img.shape[2:]
+            device = torch.cuda.current_device()
+            img = torch.tensor(img, dtype=torch.float32, device=device)
+
         ############################## Get either lidar or pseudolidar from depth map ##############################
         points_unmerged_torch = []
         if cfg.USE_PSEUDOLIDAR:
-            for pts, calib, shape in zip(batch['points_unmerged'], batch['calib'], batch['image_shape']):
-                print('before cuad')
+
+            try:
+                depth_model = model.module.depth_model
+            except:
+                depth_model = model.depth_model
+            pred = depth_model(img)
+            pred, reg_pred = pred
+            size = img.shape
+            depth_map_height, depth_map_width = size[-2:]
+
+            pred = F.upsample(input=pred, size=(size[-2], size[-1]), mode='nearest')
+            probs = pred.softmax(dim=1)
+            probs = probs.permute(0, 2, 3, 1).contiguous()  # move channel dim to the last dim
+            depth_pred = (probs * depth_model.bin_values).sum(
+                dim=-1)  # broadcasting should allow us not to expand the bin_values
+
+            reg_pred = F.upsample(input=reg_pred, size=(size[-2], size[-1]), mode='nearest').squeeze()
+            depth_maps = depth_pred * reg_pred
+
+            # confirm depth maps the same as SORD
+
+            # for pts, calib, shape in zip(batch['points_unmerged'], batch['calib'], batch['image_shape']):
+            for depth_map, calib, shape, pl_shape in zip(depth_maps, batch['calib'], batch['image_shape'], batch['pseudolidar_image_shape']):
                 calib = calibration.Calibration_torch(calib).cuda()
-                print('after cuad')
 
-                # todo: this code is only needed for debugging lidar points, can be removed when using pl
-                pts_torch = torch.Tensor(pts).cuda()[:, :3]
-                pts_img_torch, pts_depth_torch = calib.lidar_to_img(pts_torch)
+                # # todo: this code is only needed for debugging lidar points, can be removed when using pl
+                # pts_torch = torch.Tensor(pts).cuda()[:, :3]
+                # pts_img_torch, pts_depth_torch = calib.lidar_to_img(pts_torch)
+                #
+                # ### addition code
+                # depth_map = torch.zeros(tuple(shape), device=device)
+                # cols = pts_img_torch[:, 0]
+                # rows = pts_img_torch[:, 1]
+                # cols = cols.long()
+                # rows = rows.long()
+                #
+                # # constructed depth map
+                # depth_map[rows, cols] = pts_depth_torch
+                # # top_margin, left_margin = 480, 0  # todo: need to figure out size
+                # # depth_map_height, depth_map_width = 960, 600
+                # top_margin, left_margin = 0, 0  # todo: need to figure out size
+                # depth_map_height, depth_map_width = shape
+                #
+                # # crop
+                # # depth_map *= ck
+                # depth_map = depth_map[top_margin: top_margin + depth_map_height,
+                #             left_margin: left_margin + depth_map_width]
+                # valid = depth_map != 0
+                # valid = valid.flatten()
+                # # todo: end this code is only needed for debugging lidar points, can be removed when using pl
 
-                ### addition code
-                depth_map = torch.zeros(tuple(shape), device=device)
-                cols = pts_img_torch[:, 0]
-                rows = pts_img_torch[:, 1]
-                cols = cols.long()
-                rows = rows.long()
-
-                # constructed depth map
-                depth_map[rows, cols] = pts_depth_torch
-                # top_margin, left_margin = 480, 0  # todo: need to figure out size
-                # depth_map_height, depth_map_width = 960, 600
-                top_margin, left_margin = 0, 0  # todo: need to figure out size
-                depth_map_height, depth_map_width = shape
-
-                # crop
-                # depth_map *= ck
-                depth_map = depth_map[top_margin: top_margin + depth_map_height,
-                            left_margin: left_margin + depth_map_width]
-                # todo: end this code is only needed for debugging lidar points, can be removed when using pl
-                valid = depth_map != 0
-                valid = valid.flatten()
-
-                import numpy as np
-                row_linspace = torch.arange(top_margin, top_margin + depth_map_height)
-                col_linspace = torch.arange(left_margin, left_margin + depth_map_width)
+                top_margin = int(cfg.DEPTH_MAP_TOP_MARGIN_PCT * pl_shape[0])
+                left_margin = 0
+                row_linspace = torch.arange(top_margin, top_margin + depth_map_height, dtype=torch.float32)
+                col_linspace = torch.arange(left_margin, left_margin + depth_map_width, dtype=torch.float32)
                 rows, cols = torch.meshgrid(row_linspace, col_linspace)
 
-                # todo: not needed for pl
-                cols = cols.flatten()[valid].cuda()
-                rows = rows.flatten()[valid].cuda()
-                pts_depth_torch = depth_map.flatten()[valid]
-                # todo: end not needed for pl
+                # scale rows and cols wrt the original image size
+                original_width = shape[1]
+                scale = original_width / cfg.INJECT_SEMANTICS_WIDTH
+                cols = cols.clone()
+                rows = rows.clone()
+                cols *= scale
+                rows *= scale
+
+                cols = cols.flatten().cuda()
+                rows = rows.flatten().cuda()
+                pts_depth_torch = depth_map.flatten()
 
                 pts_rect_torch = calib.img_to_rect(cols, rows, pts_depth_torch)
                 pts_torch = calib.rect_to_lidar(pts_rect_torch)
@@ -104,22 +136,17 @@ def between_dataloading_and_feedforward(batch, model, loader):
                 seg_model = model.seg_model
                 
             import numpy as np  # todo: for some reason, error is thrown if this line is at the top
-            img = batch['img']
-            image_shape = img.shape[2:]
-            device = torch.cuda.current_device()
-            img = torch.tensor(img, dtype=torch.float32, device=device)
+            pred_batch, _ = seg_model(img)
 
-            pred_batch = seg_model(img)
-
-            # todo: try nearest neighbor when we pass features down because those might be more accuracte probabilities
             pred_batch = F.upsample(input=pred_batch, size=list(image_shape), mode='bilinear')
 
             if cfg.INJECT_SEMANTICS_MODE == 'binary_car_mask':
                 # argmax strategy
                 pred_batch = pred_batch.argmax(dim=1, keepdim=True)
                 pred_batch = pred_batch == 13  # convert to binary mask for cars for now
-                pred_batch = pred_batch.int()
+                pred_batch = pred_batch.float()
             elif cfg.INJECT_SEMANTICS_MODE == 'logit_car_mask':
+                pred_batch = pred_batch.softmax(dim=1)
                 pred_batch = pred_batch[:, 13: 14, :, :]
 
             # probability distribution strategy
@@ -164,6 +191,31 @@ def between_dataloading_and_feedforward(batch, model, loader):
                 semantic_pts = torch.cat([pts, semantics], dim=1)
                 semantic_pts_lst.append(semantic_pts)
             batch['points_unmerged'] = semantic_pts_lst
+
+        if cfg.SPARSIFY_PL_PTS:
+            for i, pts in enumerate(batch['points_unmerged']):
+                if cfg.INJECT_SEMANTICS:
+                    foreground_pts_mask = pts[:, 3] > 0.5
+                    foreground_pts = pts[foreground_pts_mask]
+                    background_pts = pts[~foreground_pts_mask]
+                    # print(len(foreground_pts), len(background_pts))
+
+                    foreground_pts_pct = 0.2
+                    background_pts_pct = 0.05
+                    foreground_pts_cnt = int(foreground_pts_pct * len(foreground_pts))
+                    background_pts_cnt = int(background_pts_pct * len(background_pts))
+                    foreground_shuffle_idx = torch.randperm(len(foreground_pts))[:foreground_pts_cnt]
+                    background_shuffle_idx = torch.randperm(len(background_pts))[:background_pts_cnt]
+                    foreground_pts_sparsified = foreground_pts[foreground_shuffle_idx]
+                    background_pts_sparsified = background_pts[background_shuffle_idx]
+                    pts_sparsified = torch.cat([foreground_pts_sparsified, background_pts_sparsified])
+                else:
+                    pts_pct = 0.1
+                    pts_cnt = int(pts_pct * len(pts))
+                    shuffle_idx = torch.randperm(len(pts))[:pts_cnt]
+                    pts_sparsified = pts[shuffle_idx]
+                batch['points_unmerged'][i] = pts_sparsified
+
 
         ############################## Voxelize and collate ##############################
         points_batch_torch = batch['points_unmerged']

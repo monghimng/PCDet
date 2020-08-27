@@ -693,7 +693,12 @@ class KittiDataset(BaseKittiDataset):
     def __getitem__(self, index):
 
         # # for debug purpose, uncomment this to fix the frame
-        # index = 5
+        # index = 0
+        # index = 300
+        # for index, info in enumerate(self.kitti_infos):
+        #     if info['point_cloud']['lidar_idx'] == '100001284':
+        #         break
+        # print(self.kitti_infos[index]['point_cloud']['lidar_idx'])
 
         info = copy.deepcopy(self.kitti_infos[index])
 
@@ -755,7 +760,7 @@ class KittiDataset(BaseKittiDataset):
             bev = self.get_bev(sample_idx)
             example['bev'] = bev
 
-        if cfg.INJECT_SEMANTICS:
+        if cfg.INJECT_SEMANTICS or cfg.USE_PSEUDOLIDAR:
             # todo: check the ordering of the imagenet mean and std. is it rgb or bgr?
             img = self.get_image(sample_idx)
 
@@ -775,8 +780,20 @@ class KittiDataset(BaseKittiDataset):
             std = np.array([0.229, 0.224, 0.225])
             img = input_transform(img, mean, std)  # normalize wrt to imagenet
             img = img.transpose((2, 0, 1))  # change dim ordering to c, h, w for torch
-
             example['img'] = img
+            example['pseudolidar_image_shape'] = img.shape[-2:]
+
+            # if using pseudolidar from depth estimation, we need to crop out the sky and the road
+            if cfg.USE_PSEUDOLIDAR:
+                # first scale down, then crop out sky and roads
+                oh, ow = img.shape[-2:]
+                bottom_p, top_p = .15, cfg.DEPTH_MAP_TOP_MARGIN_PCT
+                top = oh * top_p
+                bottom = oh - (oh * bottom_p)
+                top = int(top)
+                bottom = int(bottom)
+                img_cropped = img[:, top: bottom, :]
+                example['img'] = img_cropped
 
         return example
 

@@ -30,7 +30,23 @@ class Detector3D(nn.Module):
             MODEL.PRETRAINED /home/eecs/monghim.ng/BESEG/hrnet/hrnet_w48_cityscapes_cls19_1024x2048_trainset.pth \
             '''
             self.seg_model = parse_args_and_construct_model(seg_args)
-            self.seg_model.ck = torch.nn.parameter.Parameter(torch.Tensor([1])).cuda()
+        # if true, initialize a segmentation model to inject semantic features
+        if cfg.USE_PSEUDOLIDAR:
+            from hrnet.tools.train import parse_args_and_construct_model
+            pretrained = '/data/ck/BEVSEG/BESEG/hrnet/run/argo_w18_512res_kittiweights_2/best.pth'
+            depth_args = ''' --cfg /home/eecs/monghim.ng/BEVSEG/BESEG/hrnet/experiments/argoverse/argoverse_depth_w18.yaml \
+            MODEL.PRETRAINED {} \
+            '''.format(pretrained)
+            self.depth_model = parse_args_and_construct_model(depth_args)
+
+            import numpy as np
+            alpha = 1.
+            beta = 80.
+            intervals = 120
+            thresholds = np.log(alpha) + np.log(beta / alpha) * torch.arange(0., intervals + 1) / intervals
+            thresholds = torch.exp(thresholds)
+            bin_values = thresholds[:-1]
+            self.depth_model.register_buffer('bin_values', bin_values)
 
     @property
     def mode(self):

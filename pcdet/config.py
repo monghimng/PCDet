@@ -68,6 +68,9 @@ cfg.ROOT_DIR = (Path(__file__).resolve().parent / '../').resolve()
 cfg.LOCAL_RANK = 0
 
 # default flags
+
+cfg.wandb_has_initialized = False  # don't change this, this is only for internal logging use
+
 cfg.TAG_PTS_WITH_RGB = False
 cfg.MODE = '3dobjdet'
 cfg.ALTERNATE_PT_CLOUD_ABS_DIR = ''  # default to empty str which represents False
@@ -82,5 +85,8 @@ cfg.INJECT_SEMANTICS_MODE = 'binary_car_mask'  # one of binary_car_mask, logit_c
 cfg.TRAIN_SEMANTIC_NETWORK = False
 cfg.SEMANTICS_ZERO_OUT = False
 cfg.USE_PSEUDOLIDAR = False
+cfg.DEPTH_MAP_TOP_MARGIN_PCT = .35
+cfg.SPARSIFY_PL_PTS = True
+
 
 # cfg.TORCH_VOXEL_GENERATOR  # set by a combination of other scripts
